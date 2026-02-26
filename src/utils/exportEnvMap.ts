@@ -19,30 +19,6 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function flipY(
-  data: Uint8Array | Float32Array,
-  width: number,
-  height: number,
-  stride: number
-) {
-  const rowSize = width * stride;
-  const rowA = new (data.constructor as Uint8ArrayConstructor | Float32ArrayConstructor)(
-    rowSize
-  );
-  const rowB = new (data.constructor as Uint8ArrayConstructor | Float32ArrayConstructor)(
-    rowSize
-  );
-
-  for (let y = 0; y < Math.floor(height / 2); y++) {
-    const top = y * rowSize;
-    const bottom = (height - y - 1) * rowSize;
-    rowA.set(data.subarray(top, top + rowSize));
-    rowB.set(data.subarray(bottom, bottom + rowSize));
-    data.set(rowB, top);
-    data.set(rowA, bottom);
-  }
-}
-
 function rgbaToRgb(data: Float32Array) {
   const pixels = data.length / 4;
   const rgb = new Float32Array(pixels * 3);
@@ -85,7 +61,6 @@ export function exportEnvMapHDR({
   renderer.readRenderTargetPixels(target, 0, 0, width, height, rgba);
   target.dispose();
 
-  flipY(rgba, width, height, 4);
   const rgb = rgbaToRgb(rgba);
 
   const imageData = new HDRImageData();
@@ -119,8 +94,6 @@ export async function exportEnvMapPNG({
   const rgba = new Uint8Array(width * height * 4);
   renderer.readRenderTargetPixels(target, 0, 0, width, height, rgba);
   target.dispose();
-
-  flipY(rgba, width, height, 4);
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
