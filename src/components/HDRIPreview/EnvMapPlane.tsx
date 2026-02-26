@@ -1,16 +1,43 @@
 import * as THREE from "three";
 import { RenderCubeTexture } from "@react-three/drei";
-import { ComputeFunction, useThree } from "@react-three/fiber";
+import { ComputeFunction, useFrame, useThree } from "@react-three/fiber";
 import { Env } from "../Env";
 import { CubeMaterial } from "./CubeMaterial";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
+import { useSetAtom } from "jotai";
+import { envMapTextureAtom, sceneRendererAtom } from "../../store";
 
 const zero = new THREE.Vector3(0, 0, 0);
 const dir = new THREE.Vector3(0, 0, 0);
 
 export function EnvMapPlane() {
   const ref = useRef<THREE.Mesh>(null!);
+  const lastTextureRef = useRef<THREE.CubeTexture | null>(null);
   const viewport = useThree((state) => state.viewport);
+  const renderer = useThree((state) => state.gl);
+  const setTexture = useSetAtom(envMapTextureAtom);
+  const setRenderer = useSetAtom(sceneRendererAtom);
+
+  useEffect(() => {
+    setRenderer(renderer);
+    return () => {
+      setRenderer(null);
+      setTexture(null);
+      lastTextureRef.current = null;
+    };
+  }, [renderer, setRenderer, setTexture]);
+
+  useFrame(() => {
+    const material = ref.current?.material as THREE.ShaderMaterial | undefined;
+    const map = material?.uniforms?.map?.value as
+      | THREE.CubeTexture
+      | undefined;
+
+    if (map?.isCubeTexture && map !== lastTextureRef.current) {
+      lastTextureRef.current = map;
+      setTexture(map);
+    }
+  });
 
   const compute: ComputeFunction = (event, state) => {
     state.pointer.set(
