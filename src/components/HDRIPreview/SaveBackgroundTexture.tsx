@@ -12,6 +12,6 @@ export function SaveBackgroundTexture({
     if (backgroundTexture instanceof THREE.CubeTexture) {
       setTexture(backgroundTexture);
     }
-  }, [backgroundTexture]);
+  }, [backgroundTexture, setTexture]);
   return null;
 }

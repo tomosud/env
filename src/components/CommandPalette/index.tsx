@@ -10,6 +10,7 @@ import clsx from "clsx";
 import { useAtom, useSetAtom } from "jotai";
 import { Light, isCommandPaletteOpenAtom, lightsAtom } from "../../store";
 import * as THREE from "three";
+import { withBasePath } from "../../utils/withBasePath";
 
 export function CommandPalette() {
   const [open, setOpen] = useAtom(isCommandPaletteOpenAtom);
@@ -193,7 +194,7 @@ function Item({
         ...commonProps,
         type: "texture",
         color: "#ffffff",
-        map: "/textures/softbox-octagon.exr",
+        map: withBasePath("textures/softbox-octagon.exr"),
       });
     } else if (value === "procedural_scrim") {
       addLight({
@@ -208,14 +209,14 @@ function Item({
         ...commonProps,
         type: "texture",
         color: "#ffffff",
-        map: "/textures/umbrella.exr",
+        map: withBasePath("textures/umbrella.exr"),
       });
     } else if (value === "flash_head") {
       addLight({
         ...commonProps,
         type: "texture",
         color: "#ffffff",
-        map: "/textures/flash-head.exr",
+        map: withBasePath("textures/flash-head.exr"),
       });
     } else if (value === "procedural_umbrella") {
       addLight({
@@ -268,7 +269,7 @@ function Item({
 function Softbox() {
   return (
     <img
-      src="/textures/softbox-octagon.png"
+      src={withBasePath("textures/softbox-octagon.png")}
       alt="Softbox"
       className="w-48 h-48"
       loading="lazy"
@@ -279,7 +280,7 @@ function Softbox() {
 function Scrim() {
   return (
     <img
-      src="/textures/scrim.png"
+      src={withBasePath("textures/scrim.png")}
       alt="Scrim"
       className="w-48 h-48"
       loading="lazy"
@@ -290,7 +291,7 @@ function Scrim() {
 function FlashHead() {
   return (
     <img
-      src="/textures/flash-head.png"
+      src={withBasePath("textures/flash-head.png")}
       alt="Softbox"
       className="w-48 h-48"
       loading="lazy"
@@ -301,7 +302,7 @@ function FlashHead() {
 function Umbrella() {
   return (
     <img
-      src="/textures/umbrella.png"
+      src={withBasePath("textures/umbrella.png")}
       alt="Umbrella"
       className="w-48 h-48"
       loading="lazy"

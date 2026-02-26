@@ -14,3 +14,19 @@
 ## Demo
 
 https://user-images.githubusercontent.com/8302959/190044237-7f99cea2-723b-4d7e-b816-7942927abf2f.mp4
+
+## Run locally (Windows)
+
+```bat
+run.bat
+```
+
+The script auto-detects `yarn`/`corepack`, installs dependencies when needed, and starts Vite on `http://localhost:5173`.
+
+## GitHub Pages
+
+This repo includes `.github/workflows/deploy-pages.yml`.
+
+1. Push to `main`.
+2. In GitHub, enable Pages with source `GitHub Actions`.
+3. The workflow builds with `VITE_BASE_PATH=/<repo-name>/` and deploys `dist/`.

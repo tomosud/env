@@ -1,12 +1,19 @@
 import { BoltIcon } from "@heroicons/react/24/solid";
 import { Bvh, Environment, PerformanceMonitor } from "@react-three/drei";
-import { Canvas, ThreeEvent } from "@react-three/fiber";
+import { Canvas, ThreeEvent, useThree } from "@react-three/fiber";
 import { useAtomValue, useSetAtom } from "jotai";
-import { PointerEvent, Suspense, useCallback } from "react";
+import { PointerEvent, Suspense, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import * as THREE from "three";
-import { isLightPaintingAtom, lightsAtom, pointerAtom } from "../../store";
+import {
+  envMapTextureAtom,
+  isLightPaintingAtom,
+  lightsAtom,
+  pointerAtom,
+  sceneRendererAtom,
+} from "../../store";
 import { Env } from "../Env";
+import { SaveBackgroundTexture } from "../HDRIPreview/SaveBackgroundTexture";
 import { Model } from "../Model";
 import { Cameras } from "./Cameras";
 import { Controls } from "./Controls";
@@ -15,6 +22,22 @@ import { Lights } from "./Lights";
 
 const plusZ = new THREE.Vector3(0, 0, 1);
 const spherical = new THREE.Spherical();
+
+function SceneStateBridge() {
+  const renderer = useThree((state) => state.gl);
+  const setRenderer = useSetAtom(sceneRendererAtom);
+  const setTexture = useSetAtom(envMapTextureAtom);
+
+  useEffect(() => {
+    setRenderer(renderer);
+    return () => {
+      setRenderer(null);
+      setTexture(null);
+    };
+  }, [renderer, setRenderer, setTexture]);
+
+  return <SaveBackgroundTexture setTexture={setTexture} />;
+}
 
 export function ScenePreview() {
   const setLights = useSetAtom(lightsAtom);
@@ -129,6 +152,7 @@ export function ScenePreview() {
             <Env />
           </Environment>
         </Suspense>
+        <SceneStateBridge />
 
         {/* <Effects /> */}
 

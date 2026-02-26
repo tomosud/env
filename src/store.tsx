@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { atom } from "jotai";
 import { splitAtom, atomWithStorage } from "jotai/utils";
+import { withBasePath } from "./utils/withBasePath";
 
 export type Camera = {
   id: string;
@@ -84,7 +85,10 @@ export const activeModesAtom = atom((get) => {
 
 export const isLightPaintingAtom = atom(false);
 
-export const modelUrlAtom = atom("/911-transformed.glb");
+export const modelUrlAtom = atom(withBasePath("911-transformed.glb"));
+
+export const envMapTextureAtom = atom<THREE.CubeTexture | null>(null);
+export const sceneRendererAtom = atom<THREE.WebGLRenderer | null>(null);
 
 export const isCommandPaletteOpenAtom = atom(false);
 

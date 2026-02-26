@@ -1,22 +1,77 @@
 import {
+  ArrowDownTrayIcon,
   ArrowTopRightOnSquareIcon,
   CodeBracketIcon,
   PaintBrushIcon,
   PhotoIcon,
 } from "@heroicons/react/24/solid";
 import * as Toolbar from "@radix-ui/react-toolbar";
-import { activeModesAtom, modeAtom } from "../../store";
-import { Logo } from "./Logo";
 import { useAtomValue, useSetAtom } from "jotai";
+import { useState } from "react";
+import { toast } from "sonner";
+import {
+  activeModesAtom,
+  envMapTextureAtom,
+  modeAtom,
+  sceneRendererAtom,
+} from "../../store";
+import {
+  ExportResolution,
+  exportEnvMapHDR,
+  exportEnvMapPNG,
+} from "../../utils/exportEnvMap";
+import { Logo } from "./Logo";
 
 export function AppToolbar() {
   const setMode = useSetAtom(modeAtom);
   const activeModes = useAtomValue(activeModesAtom);
+  const texture = useAtomValue(envMapTextureAtom);
+  const renderer = useAtomValue(sceneRendererAtom);
+  const [resolution, setResolution] = useState<ExportResolution>("2k");
+  const [isExporting, setIsExporting] = useState(false);
+
+  const canExport = !!texture && !!renderer && !isExporting;
+
+  async function handleExportHDR() {
+    if (!texture || !renderer) {
+      toast.error("Environment map is not ready yet.");
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+      exportEnvMapHDR({ texture, renderer, resolution });
+      toast.success(`Saved HDR (${resolution})`);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to export HDR.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  async function handleExportPNG() {
+    if (!texture || !renderer) {
+      toast.error("Environment map is not ready yet.");
+      return;
+    }
+
+    try {
+      setIsExporting(true);
+      await exportEnvMapPNG({ texture, renderer, resolution });
+      toast.success(`Saved PNG (${resolution})`);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to export PNG.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   return (
     <Toolbar.Root
       aria-label="Editing options"
-      className="flex items-center justify-between min-w-[max-content] px-4 pt-1"
+      className="flex items-center justify-between min-w-[max-content] px-4 pt-1 gap-4"
     >
       <span className="p-3 flex items-center gap-4">
         <Logo />
@@ -66,6 +121,40 @@ export function AppToolbar() {
           </Toolbar.ToggleItem>
         ))}
       </Toolbar.ToggleGroup>
+
+      <div className="flex items-center gap-2 ml-auto">
+        <label className="text-xs text-white/70">Export</label>
+        <select
+          className="h-8 rounded-md bg-neutral-900 ring-1 ring-white/20 px-2 text-xs uppercase tracking-wide"
+          value={resolution}
+          onChange={(event) =>
+            setResolution(event.target.value as ExportResolution)
+          }
+          disabled={isExporting}
+        >
+          <option value="1k">1k</option>
+          <option value="2k">2k</option>
+          <option value="4k">4k</option>
+        </select>
+
+        <button
+          className="flex items-center text-xs px-3 py-1.5 leading-4 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleExportHDR}
+          disabled={!canExport}
+        >
+          <ArrowDownTrayIcon className="w-4 h-4 mr-1.5" />
+          HDR
+        </button>
+
+        <button
+          className="flex items-center text-xs px-3 py-1.5 leading-4 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleExportPNG}
+          disabled={!canExport}
+        >
+          <ArrowDownTrayIcon className="w-4 h-4 mr-1.5" />
+          PNG
+        </button>
+      </div>
 
       <Toolbar.Link
         href="https://github.com/pmndrs/env"

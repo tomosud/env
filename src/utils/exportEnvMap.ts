@@ -1,0 +1,146 @@
+import * as THREE from "three";
+import convertCubemapToEquirectangular from "../components/HDRIPreview/convertCubemapToEquirectangular";
+import { encodeRGBE, HDRImageData } from "@derschmale/io-rgbe";
+
+export type ExportResolution = "1k" | "2k" | "4k";
+
+const resolutionMap: Record<ExportResolution, [number, number]> = {
+  "1k": [1024, 512],
+  "2k": [2048, 1024],
+  "4k": [4096, 2048],
+};
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = url;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function flipY(
+  data: Uint8Array | Float32Array,
+  width: number,
+  height: number,
+  stride: number
+) {
+  const rowSize = width * stride;
+  const rowA = new (data.constructor as Uint8ArrayConstructor | Float32ArrayConstructor)(
+    rowSize
+  );
+  const rowB = new (data.constructor as Uint8ArrayConstructor | Float32ArrayConstructor)(
+    rowSize
+  );
+
+  for (let y = 0; y < Math.floor(height / 2); y++) {
+    const top = y * rowSize;
+    const bottom = (height - y - 1) * rowSize;
+    rowA.set(data.subarray(top, top + rowSize));
+    rowB.set(data.subarray(bottom, bottom + rowSize));
+    data.set(rowB, top);
+    data.set(rowA, bottom);
+  }
+}
+
+function rgbaToRgb(data: Float32Array) {
+  const pixels = data.length / 4;
+  const rgb = new Float32Array(pixels * 3);
+
+  for (let i = 0; i < pixels; i++) {
+    rgb[i * 3] = data[i * 4];
+    rgb[i * 3 + 1] = data[i * 4 + 1];
+    rgb[i * 3 + 2] = data[i * 4 + 2];
+  }
+
+  return rgb;
+}
+
+function getSize(resolution: ExportResolution) {
+  return resolutionMap[resolution];
+}
+
+export function exportEnvMapHDR({
+  texture,
+  renderer,
+  resolution,
+  filename = "envmap.hdr",
+}: {
+  texture: THREE.CubeTexture;
+  renderer: THREE.WebGLRenderer;
+  resolution: ExportResolution;
+  filename?: string;
+}) {
+  const [width, height] = getSize(resolution);
+  const target = convertCubemapToEquirectangular(
+    texture,
+    renderer,
+    width,
+    height,
+    THREE.LinearSRGBColorSpace,
+    THREE.FloatType
+  );
+
+  const rgba = new Float32Array(width * height * 4);
+  renderer.readRenderTargetPixels(target, 0, 0, width, height, rgba);
+  target.dispose();
+
+  flipY(rgba, width, height, 4);
+  const rgb = rgbaToRgb(rgba);
+
+  const imageData = new HDRImageData();
+  imageData.width = width;
+  imageData.height = height;
+  imageData.exposure = 1;
+  imageData.gamma = 1;
+  imageData.data = rgb;
+
+  downloadBlob(
+    new Blob([encodeRGBE(imageData)], {
+      type: "application/octet-stream",
+    }),
+    filename
+  );
+}
+
+export async function exportEnvMapPNG({
+  texture,
+  renderer,
+  resolution,
+  filename = "envmap.png",
+}: {
+  texture: THREE.CubeTexture;
+  renderer: THREE.WebGLRenderer;
+  resolution: ExportResolution;
+  filename?: string;
+}) {
+  const [width, height] = getSize(resolution);
+  const target = convertCubemapToEquirectangular(texture, renderer, width, height);
+  const rgba = new Uint8Array(width * height * 4);
+  renderer.readRenderTargetPixels(target, 0, 0, width, height, rgba);
+  target.dispose();
+
+  flipY(rgba, width, height, 4);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error("Failed to create 2D canvas context.");
+  }
+
+  context.putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0);
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((imageBlob) => {
+      if (imageBlob) {
+        resolve(imageBlob);
+      } else {
+        reject(new Error("Failed to encode PNG."));
+      }
+    }, "image/png");
+  });
+
+  downloadBlob(blob, filename);
+}
