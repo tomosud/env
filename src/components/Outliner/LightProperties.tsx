@@ -42,16 +42,30 @@ export function LightProperties({
     pane.current.addBlade({ view: "separator" });
 
     pane.current
-      .addBinding(light, "scale", { min: 0, step: 0.1 })
+      .addBinding(light, "scale", { min: 0, max: 10, step: 0.1 })
       .on("change", handleChange);
     pane.current
-      .addBinding(light, "scaleX", { label: "width", min: 0, step: 0.1 })
+      .addBinding(light, "scaleX", {
+        label: "width",
+        min: 0,
+        max: 10,
+        step: 0.1,
+      })
       .on("change", handleChange);
     pane.current
-      .addBinding(light, "scaleY", { label: "height", min: 0, step: 0.1 })
+      .addBinding(light, "scaleY", {
+        label: "height",
+        min: 0,
+        max: 10,
+        step: 0.1,
+      })
       .on("change", handleChange);
     pane.current
-      .addBinding(light, "rotation", { step: 0.1 })
+      .addBinding(light, "rotation", {
+        min: -Math.PI,
+        max: Math.PI,
+        step: 0.01,
+      })
       .on("change", handleChange);
     pane.current
       .addBinding(light, "latlon", {
@@ -59,7 +73,13 @@ export function LightProperties({
         y: { inverted: true, min: -1, max: 1, step: 0.01 },
       })
       .on("change", handleChange);
-    pane.current.addBinding(light, "target").on("change", handleChange);
+    pane.current
+      .addBinding(light, "target", {
+        x: { min: -10, max: 10, step: 0.1 },
+        y: { min: -10, max: 10, step: 0.1 },
+        z: { min: -10, max: 10, step: 0.1 },
+      })
+      .on("change", handleChange);
     pane.current
       .addButton({ title: "Paint Light", label: "", disabled: isLightPainting })
       .on("click", () => {
@@ -79,7 +99,7 @@ export function LightProperties({
 
     pane.current.addBinding(light, "color").on("change", handleChange);
     pane.current
-      .addBinding(light, "intensity", { min: 0, step: 0.1 })
+      .addBinding(light, "intensity", { min: 0, max: 20, step: 0.1 })
       .on("change", handleChange);
     pane.current
       .addBinding(light, "opacity", { min: 0, max: 1 })
