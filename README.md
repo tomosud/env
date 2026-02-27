@@ -11,7 +11,21 @@
 
 - Position and style your lights to fit the model
 - Click on a point on your 3D model to position lights so that they illuminate the surface
-- Export to JSX, .png, or .hdr files ready to use in your projects
+- Export environment maps as `.png` or `.hdr` with scene settings `.json`
+- `IBL Yaw` rotation for the environment (included in undo/redo history)
+- Right-side **IBL MATCAP** panel:
+  - Live hemisphere preview (auto-updates while editing)
+  - Save as `PNG`, `HDR`, or `OpenEXR (.exr)`
+  - Resolution selector (`1k`, `2k`, `4k`) for exports
+
+## Fork additions (from upstream)
+
+- HDR / PNG / EXR export
+- Matcap viewer and matcap export
+- Global light rotation (`IBL Yaw`)
+- Scene history persistence with undo/redo (up to 100 steps)
+- Exporting images also writes a scene `.json`
+- Drag-and-drop `.json` restore for scene recovery
 
 ## Demo
 
@@ -24,6 +38,14 @@ run.bat
 ```
 
 The script auto-detects `yarn`/`corepack`, installs dependencies when needed, and starts Vite on `http://localhost:5173`.
+
+## Export notes
+
+- Main toolbar `HDR` / `PNG`: exports the full environment map (equirectangular).
+- `IBL MATCAP` panel:
+  - `PNG` exports the matcap result.
+  - `HDR` exports the matcap result as Radiance HDR.
+  - `EXR` exports the matcap result as OpenEXR (half-float).
 
 ## GitHub Pages
 
