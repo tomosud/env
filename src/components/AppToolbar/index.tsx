@@ -7,7 +7,7 @@ import {
 } from "@heroicons/react/24/solid";
 import * as Toolbar from "@radix-ui/react-toolbar";
 import { useAtomValue, useSetAtom } from "jotai";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   activeModesAtom,
@@ -35,6 +35,16 @@ export function AppToolbar() {
   const cameras = useAtomValue(camerasAtom);
   const [resolution, setResolution] = useState<ExportResolution>("2k");
   const [isExporting, setIsExporting] = useState(false);
+  const [showHint, setShowHint] = useState(false);
+  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function triggerHint() {
+    setShowHint(true);
+    if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+    hintTimerRef.current = setTimeout(() => setShowHint(false), 4000);
+  }
+
+  useEffect(() => () => { if (hintTimerRef.current) clearTimeout(hintTimerRef.current); }, []);
 
   const canExport = !!texture && !!renderer && !isExporting;
 
@@ -50,6 +60,7 @@ export function AppToolbar() {
       exportEnvMapHDR({ texture, renderer, resolution, filename: `${basename}.hdr` });
       exportSettingsJSON({ version: 1, lights, cameras }, basename);
       toast.success(`Saved HDR + settings (${resolution})`);
+      triggerHint();
     } catch (error) {
       console.error(error);
       toast.error("Failed to export HDR.");
@@ -70,6 +81,7 @@ export function AppToolbar() {
       await exportEnvMapPNG({ texture, renderer, resolution, filename: `${basename}.png` });
       exportSettingsJSON({ version: 1, lights, cameras }, basename);
       toast.success(`Saved PNG + settings (${resolution})`);
+      triggerHint();
     } catch (error) {
       console.error(error);
       toast.error("Failed to export PNG.");
@@ -164,6 +176,13 @@ export function AppToolbar() {
           <ArrowDownTrayIcon className="w-4 h-4 mr-1.5" />
           PNG
         </button>
+
+        <span
+          className="text-xs text-white/40 transition-opacity duration-500 whitespace-nowrap"
+          style={{ opacity: showHint ? 1 : 0 }}
+        >
+          .json をドロップして設定を復帰
+        </span>
       </div>
 
       <Toolbar.Link

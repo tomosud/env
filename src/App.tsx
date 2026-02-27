@@ -66,10 +66,14 @@ function SettingsDropZone({ children }: { children: React.ReactNode }) {
       onDrop={handleDrop}
     >
       {children}
+      <p className="pointer-events-none fixed bottom-3 left-1/2 -translate-x-1/2 z-10 text-[11px] text-white/20 tracking-wide select-none">
+        json drop → シーンをオープン
+      </p>
+
       {isDragging && (
         <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center border-2 border-dashed border-blue-400 bg-blue-500/10">
           <p className="text-blue-300 text-lg font-semibold tracking-wide">
-            Drop settings JSON to restore
+            json drop → シーンをオープン
           </p>
         </div>
       )}
