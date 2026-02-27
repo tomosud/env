@@ -13,8 +13,9 @@ import {
 } from "../../store";
 import {
   ExportResolution,
-  exportEnvMapHDR,
+  exportRGBFloatHDR,
   exportSettingsJSON,
+  getResolutionSize,
   getUniqueBasename,
 } from "../../utils/exportEnvMap";
 import convertCubemapToEquirectangular from "../HDRIPreview/convertCubemapToEquirectangular";
@@ -29,7 +30,7 @@ function downloadBlob(blob: Blob, filename: string) {
   link.download = filename;
   link.href = url;
   link.click();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -46,21 +47,34 @@ function drawHemisphereFromEquirect(
   if (!context) {
     return;
   }
+  const target = buildMatcapUint8RGBAFromEquirect(
+    pixels,
+    sourceWidth,
+    sourceHeight,
+    PREVIEW_SIZE
+  );
+  context.putImageData(new ImageData(target, PREVIEW_SIZE, PREVIEW_SIZE), 0, 0);
+}
 
-  const image = context.createImageData(PREVIEW_SIZE, PREVIEW_SIZE);
-  const target = image.data;
-  const radius = PREVIEW_SIZE * 0.47;
-  const cx = PREVIEW_SIZE * 0.5;
-  const cy = PREVIEW_SIZE * 0.5;
+function buildMatcapUint8RGBAFromEquirect(
+  pixels: Uint8Array,
+  sourceWidth: number,
+  sourceHeight: number,
+  outputSize: number
+) {
+  const target = new Uint8ClampedArray(outputSize * outputSize * 4);
+  const radius = outputSize * 0.47;
+  const cx = outputSize * 0.5;
+  const cy = outputSize * 0.5;
   const invTwoPi = 1 / (Math.PI * 2);
   const invPi = 1 / Math.PI;
 
-  for (let y = 0; y < PREVIEW_SIZE; y++) {
-    for (let x = 0; x < PREVIEW_SIZE; x++) {
+  for (let y = 0; y < outputSize; y++) {
+    for (let x = 0; x < outputSize; x++) {
       const nx = (x + 0.5 - cx) / radius;
       const ny = (y + 0.5 - cy) / radius;
       const r2 = nx * nx + ny * ny;
-      const ti = (y * PREVIEW_SIZE + x) * 4;
+      const ti = (y * outputSize + x) * 4;
 
       if (r2 > 1) {
         target[ti] = 4;
@@ -97,30 +111,94 @@ function drawHemisphereFromEquirect(
     }
   }
 
-  context.putImageData(image, 0, 0);
+  return target;
 }
 
 function sampleEquirectPixels(
   texture: THREE.CubeTexture,
-  renderer: THREE.WebGLRenderer
+  renderer: THREE.WebGLRenderer,
+  width: number = EQUIRECT_WIDTH,
+  height: number = EQUIRECT_HEIGHT
+) {
+  const target = convertCubemapToEquirectangular(texture, renderer, width, height);
+  const pixels = new Uint8Array(width * height * 4);
+  renderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
+  target.dispose();
+  return pixels;
+}
+
+function sampleEquirectPixelsFloat(
+  texture: THREE.CubeTexture,
+  renderer: THREE.WebGLRenderer,
+  width: number,
+  height: number
 ) {
   const target = convertCubemapToEquirectangular(
     texture,
     renderer,
-    EQUIRECT_WIDTH,
-    EQUIRECT_HEIGHT
+    width,
+    height,
+    THREE.LinearSRGBColorSpace,
+    THREE.FloatType
   );
-  const pixels = new Uint8Array(EQUIRECT_WIDTH * EQUIRECT_HEIGHT * 4);
-  renderer.readRenderTargetPixels(
-    target,
-    0,
-    0,
-    EQUIRECT_WIDTH,
-    EQUIRECT_HEIGHT,
-    pixels
-  );
+  const pixels = new Float32Array(width * height * 4);
+  renderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
   target.dispose();
   return pixels;
+}
+
+function buildMatcapFloatRGB(
+  equirectRgba: Float32Array,
+  sourceWidth: number,
+  sourceHeight: number,
+  outputSize: number
+) {
+  const output = new Float32Array(outputSize * outputSize * 3);
+  const radius = outputSize * 0.47;
+  const cx = outputSize * 0.5;
+  const cy = outputSize * 0.5;
+  const invTwoPi = 1 / (Math.PI * 2);
+  const invPi = 1 / Math.PI;
+
+  for (let y = 0; y < outputSize; y++) {
+    for (let x = 0; x < outputSize; x++) {
+      const nx = (x + 0.5 - cx) / radius;
+      const ny = (y + 0.5 - cy) / radius;
+      const r2 = nx * nx + ny * ny;
+      const oi = (y * outputSize + x) * 3;
+
+      if (r2 > 1) {
+        output[oi] = 0;
+        output[oi + 1] = 0;
+        output[oi + 2] = 0;
+        continue;
+      }
+
+      const nz = Math.sqrt(1 - r2);
+      const normalX = nx;
+      const normalY = -ny;
+      const normalZ = nz;
+
+      const rx = 2 * normalZ * normalX;
+      const ry = 2 * normalZ * normalY;
+      const rz = -1 + 2 * normalZ * normalZ;
+
+      const longitude = Math.atan2(-rx, -rz);
+      const latitude = Math.acos(clamp(ry, -1, 1));
+      const u = ((longitude + Math.PI * 0.5) * invTwoPi + 1) % 1;
+      const v = clamp(latitude * invPi, 0, 1);
+
+      const sx = Math.floor(u * (sourceWidth - 1));
+      const sy = Math.floor(v * (sourceHeight - 1));
+      const si = (sy * sourceWidth + sx) * 4;
+
+      output[oi] = equirectRgba[si];
+      output[oi + 1] = equirectRgba[si + 1];
+      output[oi + 2] = equirectRgba[si + 2];
+    }
+  }
+
+  return output;
 }
 
 export function IBLMatcapPanel() {
@@ -188,20 +266,38 @@ export function IBLMatcapPanel() {
   ]);
 
   async function handleSavePNG() {
-    if (!previewCanvasRef.current) {
-      toast.error("Preview canvas is not ready yet.");
+    if (!texture || !renderer) {
+      toast.error("Environment map is not ready yet.");
       return;
     }
 
     try {
       setIsSavingPNG(true);
-      const updated = await redrawPreview();
-      if (!updated) {
-        toast.error("Environment map is not ready yet.");
-        return;
+      const [equirectWidth, equirectHeight] = getResolutionSize(resolution);
+      const outputSize = equirectWidth;
+      const equirect = sampleEquirectPixels(
+        texture,
+        renderer,
+        equirectWidth,
+        equirectHeight
+      );
+      const rgba = buildMatcapUint8RGBAFromEquirect(
+        equirect,
+        equirectWidth,
+        equirectHeight,
+        outputSize
+      );
+      const canvas = document.createElement("canvas");
+      canvas.width = outputSize;
+      canvas.height = outputSize;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        throw new Error("Failed to create PNG canvas.");
       }
+      context.putImageData(new ImageData(rgba, outputSize, outputSize), 0, 0);
+
       const blob = await new Promise<Blob>((resolve, reject) => {
-        previewCanvasRef.current?.toBlob((imageBlob) => {
+        canvas.toBlob((imageBlob) => {
           if (imageBlob) {
             resolve(imageBlob);
           } else {
@@ -210,7 +306,7 @@ export function IBLMatcapPanel() {
         }, "image/png");
       });
       downloadBlob(blob, `${getUniqueBasename("matcap")}.png`);
-      toast.success("Saved matcap preview PNG.");
+      toast.success(`Saved matcap PNG (${outputSize}x${outputSize}).`);
     } catch (error) {
       console.error(error);
       toast.error("Failed to save matcap preview.");
@@ -227,15 +323,29 @@ export function IBLMatcapPanel() {
 
     try {
       setIsSavingHDR(true);
-      const basename = getUniqueBasename("envmap");
-      exportEnvMapHDR({
+      const [equirectWidth, equirectHeight] = getResolutionSize(resolution);
+      const outputSize = equirectWidth;
+      const equirectFloat = sampleEquirectPixelsFloat(
         texture,
         renderer,
-        resolution,
+        equirectWidth,
+        equirectHeight
+      );
+      const matcapRGB = buildMatcapFloatRGB(
+        equirectFloat,
+        equirectWidth,
+        equirectHeight,
+        outputSize
+      );
+      const basename = getUniqueBasename("matcap");
+      exportRGBFloatHDR({
+        rgb: matcapRGB,
+        width: outputSize,
+        height: outputSize,
         filename: `${basename}.hdr`,
       });
       exportSettingsJSON({ version: 1, lights, cameras, iblRotation }, basename);
-      toast.success(`Saved HDR + settings (${resolution})`);
+      toast.success(`Saved matcap HDR + settings (${outputSize}x${outputSize})`);
     } catch (error) {
       console.error(error);
       toast.error("Failed to export HDR.");

@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import convertCubemapToEquirectangular from "../components/HDRIPreview/convertCubemapToEquirectangular";
-import { encodeRGBE, HDRImageData } from "@derschmale/io-rgbe";
 import type { Light, Camera } from "../store";
 
 export type ExportResolution = "1k" | "2k" | "4k";
@@ -33,13 +32,17 @@ const resolutionMap: Record<ExportResolution, [number, number]> = {
   "4k": [4096, 2048],
 };
 
+export function getResolutionSize(resolution: ExportResolution): [number, number] {
+  return resolutionMap[resolution];
+}
+
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.download = filename;
   link.href = url;
   link.click();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
 
 function rgbaToRgb(data: Float32Array) {
@@ -55,8 +58,142 @@ function rgbaToRgb(data: Float32Array) {
   return rgb;
 }
 
-function getSize(resolution: ExportResolution) {
-  return resolutionMap[resolution];
+function clampByte(value: number) {
+  return Math.min(255, Math.max(0, value | 0));
+}
+
+function floatRgbToRgbe(
+  r: number,
+  g: number,
+  b: number
+): [number, number, number, number] {
+  const maxComponent = Math.max(r, g, b);
+  if (!Number.isFinite(maxComponent) || maxComponent <= 1e-32) {
+    return [0, 0, 0, 0];
+  }
+
+  const exponent = Math.ceil(Math.log2(maxComponent));
+  const scale = 256 / Math.pow(2, exponent);
+
+  return [
+    clampByte(Math.round(r * scale)),
+    clampByte(Math.round(g * scale)),
+    clampByte(Math.round(b * scale)),
+    clampByte(exponent + 128),
+  ];
+}
+
+function encodeRleChannel(scanline: Uint8Array, out: number[]) {
+  const width = scanline.length;
+  let cursor = 0;
+
+  while (cursor < width) {
+    let runLength = 1;
+    while (
+      cursor + runLength < width &&
+      runLength < 127 &&
+      scanline[cursor] === scanline[cursor + runLength]
+    ) {
+      runLength++;
+    }
+
+    if (runLength >= 4) {
+      out.push(128 + runLength, scanline[cursor]);
+      cursor += runLength;
+      continue;
+    }
+
+    const literalStart = cursor;
+    let literalCount = 0;
+    while (literalStart + literalCount < width && literalCount < 128) {
+      const probe = literalStart + literalCount;
+      let probeRunLength = 1;
+      while (
+        probe + probeRunLength < width &&
+        probeRunLength < 127 &&
+        scanline[probe] === scanline[probe + probeRunLength]
+      ) {
+        probeRunLength++;
+      }
+      if (probeRunLength >= 4) {
+        break;
+      }
+      literalCount++;
+    }
+
+    if (literalCount === 0) {
+      out.push(1, scanline[cursor]);
+      cursor++;
+      continue;
+    }
+
+    out.push(literalCount);
+    for (let i = 0; i < literalCount; i++) {
+      out.push(scanline[literalStart + i]);
+    }
+    cursor += literalCount;
+  }
+}
+
+function encodeRadianceHDR(rgb: Float32Array, width: number, height: number): Uint8Array {
+  const header =
+    `#?RADIANCE\n` +
+    `FORMAT=32-bit_rle_rgbe\n\n` +
+    `-Y ${height} +X ${width}\n`;
+  const encoded: number[] = [];
+
+  for (let i = 0; i < header.length; i++) {
+    encoded.push(header.charCodeAt(i));
+  }
+
+  const r = new Uint8Array(width);
+  const g = new Uint8Array(width);
+  const b = new Uint8Array(width);
+  const e = new Uint8Array(width);
+
+  for (let y = 0; y < height; y++) {
+    encoded.push(2, 2, (width >> 8) & 0xff, width & 0xff);
+
+    for (let x = 0; x < width; x++) {
+      const rgbIndex = (y * width + x) * 3;
+      const [rr, gg, bb, ee] = floatRgbToRgbe(
+        rgb[rgbIndex],
+        rgb[rgbIndex + 1],
+        rgb[rgbIndex + 2]
+      );
+      r[x] = rr;
+      g[x] = gg;
+      b[x] = bb;
+      e[x] = ee;
+    }
+
+    encodeRleChannel(r, encoded);
+    encodeRleChannel(g, encoded);
+    encodeRleChannel(b, encoded);
+    encodeRleChannel(e, encoded);
+  }
+
+  return new Uint8Array(encoded);
+}
+
+export function exportRGBFloatHDR({
+  rgb,
+  width,
+  height,
+  filename = "matcap.hdr",
+}: {
+  rgb: Float32Array;
+  width: number;
+  height: number;
+  filename?: string;
+}) {
+  const rgbeBytes = encodeRadianceHDR(rgb, width, height);
+  downloadBlob(
+    new Blob([rgbeBytes], {
+      type: "image/vnd.radiance",
+    }),
+    filename
+  );
 }
 
 export function exportEnvMapHDR({
@@ -70,7 +207,7 @@ export function exportEnvMapHDR({
   resolution: ExportResolution;
   filename?: string;
 }) {
-  const [width, height] = getSize(resolution);
+  const [width, height] = getResolutionSize(resolution);
   const target = convertCubemapToEquirectangular(
     texture,
     renderer,
@@ -85,20 +222,7 @@ export function exportEnvMapHDR({
   target.dispose();
 
   const rgb = rgbaToRgb(rgba);
-
-  const imageData = new HDRImageData();
-  imageData.width = width;
-  imageData.height = height;
-  imageData.exposure = 1;
-  imageData.gamma = 1;
-  imageData.data = rgb;
-
-  downloadBlob(
-    new Blob([encodeRGBE(imageData)], {
-      type: "application/octet-stream",
-    }),
-    filename
-  );
+  exportRGBFloatHDR({ rgb, width, height, filename });
 }
 
 export async function exportEnvMapPNG({
@@ -112,7 +236,7 @@ export async function exportEnvMapPNG({
   resolution: ExportResolution;
   filename?: string;
 }) {
-  const [width, height] = getSize(resolution);
+  const [width, height] = getResolutionSize(resolution);
   const target = convertCubemapToEquirectangular(texture, renderer, width, height);
   const rgba = new Uint8Array(width * height * 4);
   renderer.readRenderTargetPixels(target, 0, 0, width, height, rgba);

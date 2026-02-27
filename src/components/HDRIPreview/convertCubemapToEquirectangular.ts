@@ -82,10 +82,6 @@ export default function convertCubemapToEquirectangular(
   const mesh = new THREE.Mesh(geometry, material);
   scene.add(mesh);
 
-  const size = new THREE.Vector2();
-  renderer.getSize(size);
-  renderer.setSize(width, height);
-
   const renderTarget = new THREE.WebGLRenderTarget(width, height, {
     depthBuffer: false,
     stencilBuffer: false,
@@ -98,12 +94,26 @@ export default function convertCubemapToEquirectangular(
     colorSpace,
   });
 
+  const viewport = renderer.getViewport(new THREE.Vector4());
+  const scissor = renderer.getScissor(new THREE.Vector4());
+  const scissorTest = renderer.getScissorTest();
+  const previousTarget = renderer.getRenderTarget();
+
   renderer.setRenderTarget(renderTarget);
+  renderer.setViewport(0, 0, width, height);
+  renderer.setScissor(0, 0, width, height);
+  renderer.setScissorTest(false);
   renderer.render(scene, camera);
 
-  // Reset renderer
-  renderer.setRenderTarget(null);
-  renderer.setSize(size.x, size.y);
+  // Restore renderer state
+  renderer.setRenderTarget(previousTarget);
+  renderer.setViewport(viewport);
+  renderer.setScissor(scissor);
+  renderer.setScissorTest(scissorTest);
+
+  geometry.dispose();
+  material.dispose();
+  scene.remove(mesh);
 
   return renderTarget;
 }
