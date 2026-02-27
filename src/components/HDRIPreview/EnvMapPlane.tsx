@@ -87,7 +87,7 @@ export function EnvMapPlane() {
             attach="map"
             compute={compute}
             frames={Infinity}
-            resolution={512}
+            resolution={1024}
           >
             <Env enableEvents />
           </RenderCubeTexture>
