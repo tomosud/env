@@ -38,6 +38,17 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+function toWrapped01(value: number) {
+  return ((value % 1) + 1) % 1;
+}
+
+function longitudeToScreenU(longitude: number, invTwoPi: number) {
+  // convertCubemapToEquirectangular's shader flips X in vertex stage:
+  // vUv.x = 1.0 - uv.x
+  // readRenderTargetPixels returns screen-space X, so we need the same inversion.
+  return toWrapped01(1 - (longitude + Math.PI * 0.5) * invTwoPi);
+}
+
 function drawHemisphereFromEquirect(
   pixels: Uint8Array,
   sourceWidth: number,
@@ -124,7 +135,7 @@ function buildMatcapUint8RGBAFromEquirect(
       // Hemisphere projection: sample by normal direction, not mirror reflection.
       const longitude = Math.atan2(-normalX, -normalZ);
       const latitude = Math.acos(clamp(normalY, -1, 1));
-      const u = ((longitude + Math.PI * 0.5) * invTwoPi + 1) % 1;
+      const u = longitudeToScreenU(longitude, invTwoPi);
       const v = clamp(latitude * invPi, 0, 1);
       const [r, g, b] = sampleBilinear(u, v);
       target[ti] = r;
@@ -252,7 +263,7 @@ function buildMatcapFloatRGB(
       // Hemisphere projection: sample by normal direction, not mirror reflection.
       const longitude = Math.atan2(-normalX, -normalZ);
       const latitude = Math.acos(clamp(normalY, -1, 1));
-      const u = ((longitude + Math.PI * 0.5) * invTwoPi + 1) % 1;
+      const u = longitudeToScreenU(longitude, invTwoPi);
       const v = clamp(latitude * invPi, 0, 1);
       const [r, g, b] = sampleBilinear(u, v);
       output[oi] = r;
