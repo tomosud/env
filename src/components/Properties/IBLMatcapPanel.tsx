@@ -63,7 +63,7 @@ function buildMatcapUint8RGBAFromEquirect(
   outputSize: number
 ) {
   const target = new Uint8ClampedArray(outputSize * outputSize * 4);
-  const radius = outputSize * 0.47;
+  const radius = (outputSize - 1) * 0.5;
   const cx = outputSize * 0.5;
   const cy = outputSize * 0.5;
   const invTwoPi = 1 / (Math.PI * 2);
@@ -154,7 +154,7 @@ function buildMatcapFloatRGB(
   outputSize: number
 ) {
   const output = new Float32Array(outputSize * outputSize * 3);
-  const radius = outputSize * 0.47;
+  const radius = (outputSize - 1) * 0.5;
   const cx = outputSize * 0.5;
   const cy = outputSize * 0.5;
   const invTwoPi = 1 / (Math.PI * 2);
