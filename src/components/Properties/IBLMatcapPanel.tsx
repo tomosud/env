@@ -13,6 +13,7 @@ import {
 } from "../../store";
 import {
   ExportResolution,
+  exportRGBFloatEXR,
   exportRGBFloatHDR,
   exportSettingsJSON,
   getResolutionSize,
@@ -273,6 +274,7 @@ export function IBLMatcapPanel() {
   const [resolution, setResolution] = useState<ExportResolution>("2k");
   const [isSavingPNG, setIsSavingPNG] = useState(false);
   const [isSavingHDR, setIsSavingHDR] = useState(false);
+  const [isSavingEXR, setIsSavingEXR] = useState(false);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const rotationDeg = useMemo(
@@ -282,6 +284,7 @@ export function IBLMatcapPanel() {
 
   const canSavePNG = !!texture && !!renderer && !isSavingPNG;
   const canSaveHDR = !!texture && !!renderer && !isSavingHDR;
+  const canSaveEXR = !!texture && !!renderer && !isSavingEXR;
 
   const redrawPreview = useCallback(async () => {
     if (!texture || !renderer || !previewCanvasRef.current) {
@@ -416,6 +419,45 @@ export function IBLMatcapPanel() {
     }
   }
 
+  function handleSaveEXR() {
+    if (!texture || !renderer) {
+      toast.error("Environment map is not ready yet.");
+      return;
+    }
+
+    try {
+      setIsSavingEXR(true);
+      const { outputSize, sampleWidth, sampleHeight } =
+        getMatcapRenderSizes(resolution);
+      const equirectFloat = sampleEquirectPixelsFloat(
+        texture,
+        renderer,
+        sampleWidth,
+        sampleHeight
+      );
+      const matcapRGB = buildMatcapFloatRGB(
+        equirectFloat,
+        sampleWidth,
+        sampleHeight,
+        outputSize
+      );
+      const basename = getUniqueBasename("matcap");
+      exportRGBFloatEXR({
+        rgb: matcapRGB,
+        width: outputSize,
+        height: outputSize,
+        filename: `${basename}.exr`,
+      });
+      exportSettingsJSON({ version: 1, lights, cameras, iblRotation }, basename);
+      toast.success(`Saved matcap EXR + settings (${outputSize}x${outputSize})`);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to export EXR.");
+    } finally {
+      setIsSavingEXR(false);
+    }
+  }
+
   return (
     <div className="w-[250px] rounded-md bg-black/30 ring-1 ring-white/15 p-2 space-y-2">
       <div className="flex items-center justify-between">
@@ -451,9 +493,9 @@ export function IBLMatcapPanel() {
         />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <button
-          className="flex-1 flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={handleSavePNG}
           disabled={!canSavePNG}
         >
@@ -462,12 +504,21 @@ export function IBLMatcapPanel() {
         </button>
 
         <button
-          className="flex-1 flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={handleSaveHDR}
           disabled={!canSaveHDR}
         >
           <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
           HDR
+        </button>
+
+        <button
+          className="flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleSaveEXR}
+          disabled={!canSaveEXR}
+        >
+          <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
+          EXR
         </button>
       </div>
 

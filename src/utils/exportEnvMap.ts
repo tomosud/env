@@ -196,6 +196,149 @@ export function exportRGBFloatHDR({
   );
 }
 
+export function exportRGBFloatEXR({
+  rgb,
+  width,
+  height,
+  filename = "matcap.exr",
+}: {
+  rgb: Float32Array;
+  width: number;
+  height: number;
+  filename?: string;
+}) {
+  const headerBytes: number[] = [];
+  const pushU8 = (v: number) => headerBytes.push(v & 0xff);
+  const pushU32 = (v: number) => {
+    headerBytes.push(v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >> 24) & 0xff);
+  };
+  const pushF32 = (v: number) => {
+    const b = new ArrayBuffer(4);
+    const dv = new DataView(b);
+    dv.setFloat32(0, v, true);
+    headerBytes.push(
+      dv.getUint8(0),
+      dv.getUint8(1),
+      dv.getUint8(2),
+      dv.getUint8(3)
+    );
+  };
+  const pushStr = (s: string) => {
+    for (let i = 0; i < s.length; i++) pushU8(s.charCodeAt(i));
+    pushU8(0);
+  };
+
+  const channelNames = ["A", "B", "G", "R"];
+  const channelListSize = channelNames.length * 18 + 1;
+  const pixelTypeHalf = 1;
+  const noCompression = 0;
+
+  pushU32(20000630); // magic
+  pushU32(2); // version
+
+  pushStr("compression");
+  pushStr("compression");
+  pushU32(1);
+  pushU8(noCompression);
+
+  pushStr("screenWindowCenter");
+  pushStr("v2f");
+  pushU32(8);
+  pushF32(0);
+  pushF32(0);
+
+  pushStr("screenWindowWidth");
+  pushStr("float");
+  pushU32(4);
+  pushF32(1);
+
+  pushStr("pixelAspectRatio");
+  pushStr("float");
+  pushU32(4);
+  pushF32(1);
+
+  pushStr("lineOrder");
+  pushStr("lineOrder");
+  pushU32(1);
+  pushU8(0);
+
+  pushStr("dataWindow");
+  pushStr("box2i");
+  pushU32(16);
+  pushU32(0);
+  pushU32(0);
+  pushU32(width - 1);
+  pushU32(height - 1);
+
+  pushStr("displayWindow");
+  pushStr("box2i");
+  pushU32(16);
+  pushU32(0);
+  pushU32(0);
+  pushU32(width - 1);
+  pushU32(height - 1);
+
+  pushStr("channels");
+  pushStr("chlist");
+  pushU32(channelListSize);
+
+  for (const ch of channelNames) {
+    pushStr(ch);
+    pushU32(pixelTypeHalf); // half
+    pushU32(1); // pLinear + reserved
+    pushU32(1); // xSampling
+    pushU32(1); // ySampling
+  }
+  pushU8(0); // end chlist
+  pushU8(0); // end header
+
+  const headerLength = headerBytes.length;
+  const blockCount = height;
+  const offsetTableLength = blockCount * 8;
+  const bytesPerScanline = width * channelNames.length * 2; // half x 4 channels
+  const chunkLength = 8 + bytesPerScanline; // y + dataSize + payload
+  const totalLength = headerLength + offsetTableLength + blockCount * chunkLength;
+
+  const out = new Uint8Array(totalLength);
+  out.set(headerBytes, 0);
+  const dv = new DataView(out.buffer);
+
+  let dataOffset = headerLength + offsetTableLength;
+  for (let y = 0; y < height; y++) {
+    const tablePos = headerLength + y * 8;
+    dv.setBigUint64(tablePos, BigInt(dataOffset), true);
+
+    dv.setUint32(dataOffset, y, true);
+    dv.setUint32(dataOffset + 4, bytesPerScanline, true);
+    let writePos = dataOffset + 8;
+
+    for (let x = 0; x < width; x++) {
+      dv.setUint16(writePos, THREE.DataUtils.toHalfFloat(1), true);
+      writePos += 2;
+    }
+    for (let c = 2; c >= 0; c--) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 3 + c;
+        dv.setUint16(
+          writePos,
+          THREE.DataUtils.toHalfFloat(Math.max(0, rgb[i])),
+          true
+        );
+        writePos += 2;
+      }
+    }
+
+    dataOffset += chunkLength;
+  }
+
+  downloadBlob(
+    new Blob([out], {
+      type: "image/x-exr",
+    }),
+    filename
+  );
+}
+
 export function exportEnvMapHDR({
   texture,
   renderer,
