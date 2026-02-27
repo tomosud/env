@@ -479,13 +479,24 @@ export const canRedoSceneAtom = atom((get) => {
 export const applySceneSnapshotAtom = atom(
   null,
   (get, set, snapshot: SceneSnapshot) => {
+    const nextSnapshot = createSceneSnapshot(
+      snapshot.lights,
+      snapshot.cameras,
+      snapshot.iblRotation
+    );
     set(isApplyingSceneSnapshotAtom, true);
-    set(lightsStateAtom, cloneSnapshot(snapshot.lights));
-    set(camerasStateAtom, cloneSnapshot(snapshot.cameras));
-    set(iblRotationStateAtom, snapshot.iblRotation);
+    set(lightsStateAtom, cloneSnapshot(nextSnapshot.lights));
+    set(camerasStateAtom, cloneSnapshot(nextSnapshot.cameras));
+    set(iblRotationStateAtom, nextSnapshot.iblRotation);
     set(isApplyingSceneSnapshotAtom, false);
     set(sceneDirtyAtom, false);
-    set(pushSceneHistoryAtom, snapshot);
+    // JSON restore is authoritative: replace local undo/redo stack to avoid
+    // stale IndexedDB history influencing the restored scene.
+    set(sceneHistoryAtom, {
+      entries: [nextSnapshot],
+      index: 0,
+      hydrated: true,
+    });
   }
 );
 
@@ -538,6 +549,10 @@ export const hydrateSceneHistoryAtom = atom(
     set,
     payload: { entries: SceneSnapshot[]; index: number } | null | undefined
   ) => {
+    if (get(sceneHistoryAtom).hydrated) {
+      return;
+    }
+
     const fallback = createSceneSnapshot(
       get(lightsStateAtom),
       get(camerasStateAtom),
