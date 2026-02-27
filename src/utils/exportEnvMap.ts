@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import * as fflate from "three/examples/jsm/libs/fflate.module.js";
 import convertCubemapToEquirectangular from "../components/HDRIPreview/convertCubemapToEquirectangular";
 import type { Light, Camera } from "../store";
 
@@ -200,11 +201,13 @@ export function exportRGBFloatEXR({
   rgb,
   width,
   height,
+  compression = "zip",
   filename = "matcap.exr",
 }: {
   rgb: Float32Array;
   width: number;
   height: number;
+  compression?: "none" | "zip";
   filename?: string;
 }) {
   const headerBytes: number[] = [];
@@ -231,7 +234,8 @@ export function exportRGBFloatEXR({
   const channelNames = ["A", "B", "G", "R"];
   const channelListSize = channelNames.length * 18 + 1;
   const pixelTypeHalf = 1;
-  const noCompression = 0;
+  const compressionCode = compression === "zip" ? 3 : 0; // ZIP or NONE
+  const blockLines = compressionCode === 3 ? 16 : 1;
 
   pushU32(20000630); // magic
   pushU32(2); // version
@@ -239,7 +243,7 @@ export function exportRGBFloatEXR({
   pushStr("compression");
   pushStr("compression");
   pushU32(1);
-  pushU8(noCompression);
+  pushU8(compressionCode);
 
   pushStr("screenWindowCenter");
   pushStr("v2f");
@@ -293,42 +297,86 @@ export function exportRGBFloatEXR({
   pushU8(0); // end header
 
   const headerLength = headerBytes.length;
-  const blockCount = height;
+  const blockCount = Math.ceil(height / blockLines);
   const offsetTableLength = blockCount * 8;
-  const bytesPerScanline = width * channelNames.length * 2; // half x 4 channels
-  const chunkLength = 8 + bytesPerScanline; // y + dataSize + payload
-  const totalLength = headerLength + offsetTableLength + blockCount * chunkLength;
+  const bytesPerScanline = width * channelNames.length * 2; // 4 channels x half
 
+  function zipPreprocess(bytes: Uint8Array) {
+    const tmp = new Uint8Array(bytes.length);
+    let t1 = 0;
+    let t2 = Math.floor((bytes.length + 1) / 2);
+    let s = 0;
+    while (s < bytes.length) {
+      tmp[t1++] = bytes[s++];
+      if (s < bytes.length) {
+        tmp[t2++] = bytes[s++];
+      }
+    }
+
+    let p = tmp[0];
+    for (let i = 1; i < tmp.length; i++) {
+      const d = tmp[i] - p + (128 + 256);
+      p = tmp[i];
+      tmp[i] = d & 0xff;
+    }
+    return tmp;
+  }
+
+  const blocks: { y: number; payload: Uint8Array }[] = [];
+  for (let startY = 0; startY < height; startY += blockLines) {
+    const lines = Math.min(blockLines, height - startY);
+    const raw = new Uint8Array(bytesPerScanline * lines);
+    const rawView = new DataView(raw.buffer);
+
+    for (let line = 0; line < lines; line++) {
+      const y = startY + line;
+      let pos = line * bytesPerScanline;
+
+      for (let x = 0; x < width; x++) {
+        rawView.setUint16(pos, THREE.DataUtils.toHalfFloat(1), true);
+        pos += 2;
+      }
+
+      for (let c = 2; c >= 0; c--) {
+        for (let x = 0; x < width; x++) {
+          const i = (y * width + x) * 3 + c;
+          rawView.setUint16(
+            pos,
+            THREE.DataUtils.toHalfFloat(Math.max(0, rgb[i])),
+            true
+          );
+          pos += 2;
+        }
+      }
+    }
+
+    const payload =
+      compressionCode === 3 ? fflate.zlibSync(zipPreprocess(raw), {}) : raw;
+    blocks.push({ y: startY, payload });
+  }
+
+  let payloadTotal = 0;
+  for (const block of blocks) {
+    payloadTotal += 8 + block.payload.length;
+  }
+
+  const totalLength = headerLength + offsetTableLength + payloadTotal;
   const out = new Uint8Array(totalLength);
   out.set(headerBytes, 0);
   const dv = new DataView(out.buffer);
 
   let dataOffset = headerLength + offsetTableLength;
-  for (let y = 0; y < height; y++) {
-    const tablePos = headerLength + y * 8;
-    dv.setBigUint64(tablePos, BigInt(dataOffset), true);
+  for (let i = 0; i < blocks.length; i++) {
+    dv.setBigUint64(headerLength + i * 8, BigInt(dataOffset), true);
+    dataOffset += 8 + blocks[i].payload.length;
+  }
 
-    dv.setUint32(dataOffset, y, true);
-    dv.setUint32(dataOffset + 4, bytesPerScanline, true);
-    let writePos = dataOffset + 8;
-
-    for (let x = 0; x < width; x++) {
-      dv.setUint16(writePos, THREE.DataUtils.toHalfFloat(1), true);
-      writePos += 2;
-    }
-    for (let c = 2; c >= 0; c--) {
-      for (let x = 0; x < width; x++) {
-        const i = (y * width + x) * 3 + c;
-        dv.setUint16(
-          writePos,
-          THREE.DataUtils.toHalfFloat(Math.max(0, rgb[i])),
-          true
-        );
-        writePos += 2;
-      }
-    }
-
-    dataOffset += chunkLength;
+  dataOffset = headerLength + offsetTableLength;
+  for (const block of blocks) {
+    dv.setUint32(dataOffset, block.y, true);
+    dv.setUint32(dataOffset + 4, block.payload.length, true);
+    out.set(block.payload, dataOffset + 8);
+    dataOffset += 8 + block.payload.length;
   }
 
   downloadBlob(
