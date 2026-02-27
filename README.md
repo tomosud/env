@@ -1,4 +1,5 @@
-![Screenshot of env.pmnd.rs](https://user-images.githubusercontent.com/8302959/190043093-b3800a4b-2547-489b-9411-f694b0ab1f89.png)
+<img width="1522" height="833" alt="image" src="https://github.com/user-attachments/assets/864e92f1-a4cf-4b5a-badf-daad3ce124b0" />
+
 
 [https://tomosud.github.io/env/](https://tomosud.github.io/env/)
 
@@ -26,10 +27,6 @@
 - Scene history persistence with undo/redo (up to 100 steps)
 - Exporting images also writes a scene `.json`
 - Drag-and-drop `.json` restore for scene recovery
-
-## Demo
-
-https://user-images.githubusercontent.com/8302959/190044237-7f99cea2-723b-4d7e-b816-7942927abf2f.mp4
 
 ## Run locally (Windows)
 
