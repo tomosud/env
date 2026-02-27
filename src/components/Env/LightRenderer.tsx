@@ -1,6 +1,6 @@
 import { Sphere, useCursor } from "@react-three/drei";
-import { useFrame, useThree } from "@react-three/fiber";
-import { PrimitiveAtom, useAtom, useSetAtom } from "jotai";
+import { ThreeEvent, useFrame, useThree } from "@react-three/fiber";
+import { PrimitiveAtom, useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useRef, useState } from "react";
 import * as THREE from "three";
 import {
@@ -9,6 +9,7 @@ import {
   ProceduralUmbrellaLight,
   SkyGradientLight,
   TextureLight,
+  lightsAtom,
   selectLightAtom,
 } from "../../store";
 import { ProceduralScrimLightMaterial } from "./ProceduralScrimLightMaterial";
@@ -30,20 +31,50 @@ export function LightRenderer({
   const meshRef = useRef<THREE.Mesh>(null);
   const [light, setLight] = useAtom(lightAtom);
   const selectLight = useSetAtom(selectLightAtom);
+  const lights = useAtomValue(lightsAtom);
+  const selectedLightId = lights.find((l) => l.selected)?.id;
 
   const [hovered, setHovered] = useState(false);
   useCursor(hovered, "move", "default");
 
+  const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    if (!enableEvents) {
+      return;
+    }
+
+    const hitLightIds = Array.from(
+      new Set(
+        e.intersections
+          .map((intersection) => intersection.object.userData?.lightId)
+          .filter((id): id is string => typeof id === "string")
+      )
+    );
+
+    if (hitLightIds.length === 0) {
+      return;
+    }
+
+    const selectedHitIndex = selectedLightId
+      ? hitLightIds.indexOf(selectedLightId)
+      : -1;
+    const nextLightId =
+      selectedHitIndex >= 0
+        ? hitLightIds[(selectedHitIndex + 1) % hitLightIds.length]
+        : hitLightIds[0];
+
+    if (nextLightId !== light.id) {
+      return;
+    }
+
+    e.stopPropagation();
+    selectLight(nextLightId);
+  };
+
   const size = useThree((state) => state.size);
   const bind = useGesture(
     {
-      onHover: ({ hovering, event }) => {
-        event.stopPropagation();
+      onHover: ({ hovering }) => {
         setHovered(hovering ?? false);
-      },
-      onClick: ({ event }) => {
-        event.stopPropagation();
-        selectLight(light.id);
       },
       onDrag: ({ delta: [x, y], event }) => {
         event.stopPropagation();
@@ -132,10 +163,12 @@ export function LightRenderer({
     <mesh
       {...(bind() as any)}
       ref={meshRef}
+      userData={{ lightId: light.id }}
       visible={light.visible}
       castShadow={false}
       receiveShadow={false}
       renderOrder={index}
+      onClick={handleClick}
     >
       <planeGeometry args={[1, 1, 1, 1]} />
       {light.type === "procedural_scrim" && (
