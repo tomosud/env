@@ -1,4 +1,4 @@
-import { ArrowDownTrayIcon, SparklesIcon } from "@heroicons/react/24/solid";
+import { ArrowDownTrayIcon } from "@heroicons/react/24/solid";
 import { useAtom, useAtomValue } from "jotai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -131,7 +131,7 @@ export function IBLMatcapPanel() {
   const historyIndex = useAtomValue(sceneHistoryAtom).index;
   const [iblRotation, setIblRotation] = useAtom(iblRotationAtom);
   const [resolution, setResolution] = useState<ExportResolution>("2k");
-  const [isRendering, setIsRendering] = useState(false);
+  const [isSavingPNG, setIsSavingPNG] = useState(false);
   const [isSavingHDR, setIsSavingHDR] = useState(false);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -140,7 +140,7 @@ export function IBLMatcapPanel() {
     [iblRotation]
   );
 
-  const canRender = !!texture && !!renderer && !isRendering;
+  const canSavePNG = !!texture && !!renderer && !isSavingPNG;
   const canSaveHDR = !!texture && !!renderer && !isSavingHDR;
 
   const redrawPreview = useCallback(async () => {
@@ -164,26 +164,37 @@ export function IBLMatcapPanel() {
   }, [texture, renderer]);
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const ok = await redrawPreview();
-      if (!ok && !cancelled && texture && renderer) {
-        toast.error("Failed to update IBL matcap preview.");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [redrawPreview, iblRotation, historyIndex, texture, renderer]);
+    let rafId: number | null = null;
+    const timeout = window.setTimeout(() => {
+      rafId = window.requestAnimationFrame(() => {
+        void redrawPreview();
+      });
+    }, 120);
 
-  async function handleRenderPreview() {
+    return () => {
+      window.clearTimeout(timeout);
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
+  }, [
+    redrawPreview,
+    historyIndex,
+    lights,
+    cameras,
+    iblRotation,
+    texture,
+    renderer,
+  ]);
+
+  async function handleSavePNG() {
     if (!previewCanvasRef.current) {
       toast.error("Preview canvas is not ready yet.");
       return;
     }
 
     try {
-      setIsRendering(true);
+      setIsSavingPNG(true);
       const updated = await redrawPreview();
       if (!updated) {
         toast.error("Environment map is not ready yet.");
@@ -204,7 +215,7 @@ export function IBLMatcapPanel() {
       console.error(error);
       toast.error("Failed to save matcap preview.");
     } finally {
-      setIsRendering(false);
+      setIsSavingPNG(false);
     }
   }
 
@@ -271,11 +282,11 @@ export function IBLMatcapPanel() {
       <div className="flex items-center gap-2">
         <button
           className="flex-1 flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={handleRenderPreview}
-          disabled={!canRender}
+          onClick={handleSavePNG}
+          disabled={!canSavePNG}
         >
-          <SparklesIcon className="w-3.5 h-3.5 mr-1.5" />
-          Render
+          <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
+          PNG
         </button>
 
         <button
@@ -284,7 +295,7 @@ export function IBLMatcapPanel() {
           disabled={!canSaveHDR}
         >
           <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
-          Save HDR
+          HDR
         </button>
       </div>
 
