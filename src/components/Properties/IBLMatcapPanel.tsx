@@ -49,6 +49,21 @@ function longitudeToScreenU(longitude: number, invTwoPi: number) {
   return toWrapped01(1 - (longitude + Math.PI * 0.5) * invTwoPi);
 }
 
+function directionToEquirectUV(
+  x: number,
+  y: number,
+  z: number,
+  invTwoPi: number,
+  invPi: number
+) {
+  const longitude = Math.atan2(-x, -z);
+  const latitude = Math.acos(clamp(y, -1, 1));
+  return {
+    u: longitudeToScreenU(longitude, invTwoPi),
+    v: clamp(latitude * invPi, 0, 1),
+  };
+}
+
 function drawHemisphereFromEquirect(
   pixels: Uint8Array,
   sourceWidth: number,
@@ -132,11 +147,11 @@ function buildMatcapUint8RGBAFromEquirect(
       const normalX = nx;
       const normalY = -ny;
       const normalZ = nz;
-      // Hemisphere projection: sample by normal direction, not mirror reflection.
-      const longitude = Math.atan2(-normalX, -normalZ);
-      const latitude = Math.acos(clamp(normalY, -1, 1));
-      const u = longitudeToScreenU(longitude, invTwoPi);
-      const v = clamp(latitude * invPi, 0, 1);
+      // Matcap projection: reflect fixed camera ray (0,0,-1) by hemisphere normal.
+      const rx = 2 * normalZ * normalX;
+      const ry = 2 * normalZ * normalY;
+      const rz = -1 + 2 * normalZ * normalZ;
+      const { u, v } = directionToEquirectUV(rx, ry, rz, invTwoPi, invPi);
       const [r, g, b] = sampleBilinear(u, v);
       target[ti] = r;
       target[ti + 1] = g;
@@ -260,11 +275,11 @@ function buildMatcapFloatRGB(
       const normalX = nx;
       const normalY = -ny;
       const normalZ = nz;
-      // Hemisphere projection: sample by normal direction, not mirror reflection.
-      const longitude = Math.atan2(-normalX, -normalZ);
-      const latitude = Math.acos(clamp(normalY, -1, 1));
-      const u = longitudeToScreenU(longitude, invTwoPi);
-      const v = clamp(latitude * invPi, 0, 1);
+      // Matcap projection: reflect fixed camera ray (0,0,-1) by hemisphere normal.
+      const rx = 2 * normalZ * normalX;
+      const ry = 2 * normalZ * normalY;
+      const rz = -1 + 2 * normalZ * normalZ;
+      const { u, v } = directionToEquirectUV(rx, ry, rz, invTwoPi, invPi);
       const [r, g, b] = sampleBilinear(u, v);
       output[oi] = r;
       output[oi + 1] = g;
