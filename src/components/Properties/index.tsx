@@ -1,4 +1,5 @@
 import tunnel from "tunnel-rat";
+import { IBLMatcapPanel } from "./IBLMatcapPanel";
 
 export const PropertiesPanelTunnel = tunnel();
 
@@ -11,6 +12,10 @@ export function Properties() {
 
       <div className="flex-1 overflow-y-auto p-2">
         <PropertiesPanelTunnel.Out />
+      </div>
+
+      <div className="p-2 border-t border-white/10 flex justify-end">
+        <IBLMatcapPanel />
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import {
   camerasAtom,
   commitSceneHistoryAtom,
   hydrateSceneHistoryAtom,
+  iblRotationAtom,
   isSceneDirtyAtom,
   lightsAtom,
   sceneHistoryAtom,
@@ -26,6 +27,7 @@ function SceneHistoryPersistence() {
   const history = useAtomValue(sceneHistoryAtom);
   const lights = useAtomValue(lightsAtom);
   const cameras = useAtomValue(camerasAtom);
+  const iblRotation = useAtomValue(iblRotationAtom);
   const isSceneDirty = useAtomValue(isSceneDirtyAtom);
 
   useEffect(() => {
@@ -77,7 +79,7 @@ function SceneHistoryPersistence() {
     return () => {
       clearTimeout(timer);
     };
-  }, [history.hydrated, isSceneDirty, lights, cameras, commitSceneHistory]);
+  }, [history.hydrated, isSceneDirty, lights, cameras, iblRotation, commitSceneHistory]);
 
   useEffect(() => {
     if (!history.hydrated) {
@@ -134,7 +136,13 @@ function SettingsDropZone({ children }: { children: React.ReactNode }) {
             Array.isArray(data.lights) &&
             Array.isArray(data.cameras)
           ) {
-            applySceneSnapshot(data as SettingsSnapshot);
+            applySceneSnapshot({
+              version: 1,
+              lights: data.lights,
+              cameras: data.cameras,
+              iblRotation:
+                typeof data.iblRotation === "number" ? data.iblRotation : 0,
+            });
             toast.success("Settings restored.");
           } else {
             toast.error("Invalid settings file.");

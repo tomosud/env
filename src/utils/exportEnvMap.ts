@@ -9,6 +9,7 @@ export type SettingsSnapshot = {
   version: 1;
   lights: Light[];
   cameras: Camera[];
+  iblRotation?: number;
 };
 
 export function getUniqueBasename(prefix = "envmap"): string {

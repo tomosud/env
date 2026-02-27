@@ -138,6 +138,7 @@ export type SceneSnapshot = {
   version: 1;
   lights: Light[];
   cameras: Camera[];
+  iblRotation: number;
 };
 
 type SceneHistoryState = {
@@ -152,11 +153,16 @@ function cloneSnapshot<T>(value: T): T {
   return structuredClone(value);
 }
 
-function createSceneSnapshot(lights: Light[], cameras: Camera[]): SceneSnapshot {
+function createSceneSnapshot(
+  lights: Light[],
+  cameras: Camera[],
+  iblRotation: number
+): SceneSnapshot {
   return {
     version: 1,
     lights: cloneSnapshot(lights),
     cameras: cloneSnapshot(cameras),
+    iblRotation,
   };
 }
 
@@ -210,7 +216,13 @@ function normalizeSceneHistory(
         Array.isArray(entry.cameras)
     )
     .slice(-SCENE_HISTORY_LIMIT)
-    .map((entry) => createSceneSnapshot(entry.lights, entry.cameras));
+    .map((entry) =>
+      createSceneSnapshot(
+        entry.lights,
+        entry.cameras,
+        typeof entry.iblRotation === "number" ? entry.iblRotation : 0
+      )
+    );
 
   if (trimmed.length === 0) {
     return { entries: [fallback], index: 0 };
@@ -226,10 +238,11 @@ function normalizeSceneHistory(
   };
 }
 
-const defaultSceneSnapshot = createSceneSnapshot(defaultLights, defaultCameras);
+const defaultSceneSnapshot = createSceneSnapshot(defaultLights, defaultCameras, 0);
 
 const lightsStateAtom = atom<Light[]>(cloneSnapshot(defaultLights));
 const camerasStateAtom = atom<Camera[]>(cloneSnapshot(defaultCameras));
+const iblRotationStateAtom = atom<number>(0);
 const isApplyingSceneSnapshotAtom = atom(false);
 const sceneDirtyAtom = atom(false);
 
@@ -248,8 +261,16 @@ const pushSceneHistoryAtom = atom(
 
     const history = get(sceneHistoryAtom);
     const nextSnapshot = snapshot
-      ? createSceneSnapshot(snapshot.lights, snapshot.cameras)
-      : createSceneSnapshot(get(lightsStateAtom), get(camerasStateAtom));
+      ? createSceneSnapshot(
+          snapshot.lights,
+          snapshot.cameras,
+          snapshot.iblRotation
+        )
+      : createSceneSnapshot(
+          get(lightsStateAtom),
+          get(camerasStateAtom),
+          get(iblRotationStateAtom)
+        );
     const next = appendSceneHistory(history, nextSnapshot);
 
     set(sceneHistoryAtom, {
@@ -395,6 +416,14 @@ export const camerasAtom = atom(
   }
 );
 
+export const iblRotationAtom = atom(
+  (get) => get(iblRotationStateAtom),
+  (get, set, value: number) => {
+    set(iblRotationStateAtom, value);
+    set(sceneDirtyAtom, true);
+  }
+);
+
 export const cameraAtomsAtom = splitAtom(camerasAtom);
 
 export const selectedCameraAtom = atom(
@@ -453,6 +482,7 @@ export const applySceneSnapshotAtom = atom(
     set(isApplyingSceneSnapshotAtom, true);
     set(lightsStateAtom, cloneSnapshot(snapshot.lights));
     set(camerasStateAtom, cloneSnapshot(snapshot.cameras));
+    set(iblRotationStateAtom, snapshot.iblRotation);
     set(isApplyingSceneSnapshotAtom, false);
     set(sceneDirtyAtom, false);
     set(pushSceneHistoryAtom, snapshot);
@@ -471,6 +501,7 @@ export const undoSceneAtom = atom(null, (get, set) => {
   set(isApplyingSceneSnapshotAtom, true);
   set(lightsStateAtom, cloneSnapshot(snapshot.lights));
   set(camerasStateAtom, cloneSnapshot(snapshot.cameras));
+  set(iblRotationStateAtom, snapshot.iblRotation);
   set(isApplyingSceneSnapshotAtom, false);
   set(sceneDirtyAtom, false);
   set(sceneHistoryAtom, {
@@ -491,6 +522,7 @@ export const redoSceneAtom = atom(null, (get, set) => {
   set(isApplyingSceneSnapshotAtom, true);
   set(lightsStateAtom, cloneSnapshot(snapshot.lights));
   set(camerasStateAtom, cloneSnapshot(snapshot.cameras));
+  set(iblRotationStateAtom, snapshot.iblRotation);
   set(isApplyingSceneSnapshotAtom, false);
   set(sceneDirtyAtom, false);
   set(sceneHistoryAtom, {
@@ -506,7 +538,11 @@ export const hydrateSceneHistoryAtom = atom(
     set,
     payload: { entries: SceneSnapshot[]; index: number } | null | undefined
   ) => {
-    const fallback = createSceneSnapshot(get(lightsStateAtom), get(camerasStateAtom));
+    const fallback = createSceneSnapshot(
+      get(lightsStateAtom),
+      get(camerasStateAtom),
+      get(iblRotationStateAtom)
+    );
     const normalized = normalizeSceneHistory(
       payload?.entries,
       payload?.index,
@@ -517,6 +553,7 @@ export const hydrateSceneHistoryAtom = atom(
     set(isApplyingSceneSnapshotAtom, true);
     set(lightsStateAtom, cloneSnapshot(current.lights));
     set(camerasStateAtom, cloneSnapshot(current.cameras));
+    set(iblRotationStateAtom, current.iblRotation);
     set(isApplyingSceneSnapshotAtom, false);
     set(sceneDirtyAtom, false);
     set(sceneHistoryAtom, {
@@ -535,7 +572,11 @@ export const commitSceneHistoryAtom = atom(null, (get, set) => {
     return;
   }
 
-  const snapshot = createSceneSnapshot(get(lightsStateAtom), get(camerasStateAtom));
+  const snapshot = createSceneSnapshot(
+    get(lightsStateAtom),
+    get(camerasStateAtom),
+    get(iblRotationStateAtom)
+  );
   set(sceneDirtyAtom, false);
   set(pushSceneHistoryAtom, snapshot);
 });

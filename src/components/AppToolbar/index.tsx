@@ -17,6 +17,7 @@ import {
   canUndoSceneAtom,
   camerasAtom,
   envMapTextureAtom,
+  iblRotationAtom,
   lightsAtom,
   modeAtom,
   redoSceneAtom,
@@ -39,6 +40,7 @@ export function AppToolbar() {
   const renderer = useAtomValue(sceneRendererAtom);
   const lights = useAtomValue(lightsAtom);
   const cameras = useAtomValue(camerasAtom);
+  const iblRotation = useAtomValue(iblRotationAtom);
   const canUndo = useAtomValue(canUndoSceneAtom);
   const canRedo = useAtomValue(canRedoSceneAtom);
   const undoScene = useSetAtom(undoSceneAtom);
@@ -68,7 +70,7 @@ export function AppToolbar() {
       setIsExporting(true);
       const basename = getUniqueBasename("envmap");
       exportEnvMapHDR({ texture, renderer, resolution, filename: `${basename}.hdr` });
-      exportSettingsJSON({ version: 1, lights, cameras }, basename);
+      exportSettingsJSON({ version: 1, lights, cameras, iblRotation }, basename);
       toast.success(`Saved HDR + settings (${resolution})`);
       triggerHint();
     } catch (error) {
@@ -89,7 +91,7 @@ export function AppToolbar() {
       setIsExporting(true);
       const basename = getUniqueBasename("envmap");
       await exportEnvMapPNG({ texture, renderer, resolution, filename: `${basename}.png` });
-      exportSettingsJSON({ version: 1, lights, cameras }, basename);
+      exportSettingsJSON({ version: 1, lights, cameras, iblRotation }, basename);
       toast.success(`Saved PNG + settings (${resolution})`);
       triggerHint();
     } catch (error) {
