@@ -28,10 +28,6 @@
 - Exporting images also writes a scene `.json`
 - Drag-and-drop `.json` restore for scene recovery
 
-## Demo
-
-https://user-images.githubusercontent.com/8302959/190044237-7f99cea2-723b-4d7e-b816-7942927abf2f.mp4
-
 ## Run locally (Windows)
 
 ```bat
