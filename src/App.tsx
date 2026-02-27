@@ -1,16 +1,107 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Toaster, toast } from "sonner";
-import { useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { AppContent } from "./components/AppContent";
 import { AppLayout } from "./components/AppLayout";
 import { AppToolbar } from "./components/AppToolbar";
 import { CommandPalette } from "./components/CommandPalette";
-import { lightsAtom, camerasAtom } from "./store";
+import {
+  applySceneSnapshotAtom,
+  camerasAtom,
+  commitSceneHistoryAtom,
+  hydrateSceneHistoryAtom,
+  isSceneDirtyAtom,
+  lightsAtom,
+  sceneHistoryAtom,
+  type SceneSnapshot,
+} from "./store";
 import type { SettingsSnapshot } from "./utils/exportEnvMap";
+import { idbGet, idbSet } from "./utils/indexedDb";
+
+const SCENE_HISTORY_KEY = "scene-history-v1";
+
+function SceneHistoryPersistence() {
+  const hydrateSceneHistory = useSetAtom(hydrateSceneHistoryAtom);
+  const commitSceneHistory = useSetAtom(commitSceneHistoryAtom);
+  const history = useAtomValue(sceneHistoryAtom);
+  const lights = useAtomValue(lightsAtom);
+  const cameras = useAtomValue(camerasAtom);
+  const isSceneDirty = useAtomValue(isSceneDirtyAtom);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const saved = await idbGet<{ entries: SceneSnapshot[]; index: number }>(
+          SCENE_HISTORY_KEY
+        );
+        if (!cancelled) {
+          hydrateSceneHistory(saved ?? null);
+        }
+      } catch (error) {
+        console.warn("Failed to load scene history from IndexedDB.", error);
+        if (!cancelled) {
+          hydrateSceneHistory(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrateSceneHistory]);
+
+  useEffect(() => {
+    if (!history.hydrated) {
+      return;
+    }
+
+    void idbSet(SCENE_HISTORY_KEY, {
+      entries: history.entries,
+      index: history.index,
+    }).catch((error) => {
+      console.warn("Failed to save scene history to IndexedDB.", error);
+    });
+  }, [history.entries, history.index, history.hydrated]);
+
+  useEffect(() => {
+    if (!history.hydrated || !isSceneDirty) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      commitSceneHistory();
+    }, 350);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [history.hydrated, isSceneDirty, lights, cameras, commitSceneHistory]);
+
+  useEffect(() => {
+    if (!history.hydrated) {
+      return;
+    }
+
+    const flushCommit = () => {
+      commitSceneHistory();
+    };
+
+    window.addEventListener("pointerup", flushCommit);
+    window.addEventListener("beforeunload", flushCommit);
+
+    return () => {
+      window.removeEventListener("pointerup", flushCommit);
+      window.removeEventListener("beforeunload", flushCommit);
+    };
+  }, [history.hydrated, commitSceneHistory]);
+
+  return null;
+}
 
 function SettingsDropZone({ children }: { children: React.ReactNode }) {
-  const setLights = useSetAtom(lightsAtom);
-  const setCameras = useSetAtom(camerasAtom);
+  const applySceneSnapshot = useSetAtom(applySceneSnapshotAtom);
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -43,8 +134,7 @@ function SettingsDropZone({ children }: { children: React.ReactNode }) {
             Array.isArray(data.lights) &&
             Array.isArray(data.cameras)
           ) {
-            setLights(data.lights);
-            setCameras(data.cameras);
+            applySceneSnapshot(data as SettingsSnapshot);
             toast.success("Settings restored.");
           } else {
             toast.error("Invalid settings file.");
@@ -55,7 +145,7 @@ function SettingsDropZone({ children }: { children: React.ReactNode }) {
       };
       reader.readAsText(file);
     },
-    [setLights, setCameras]
+    [applySceneSnapshot]
   );
 
   return (
@@ -85,6 +175,7 @@ export default function App() {
   return (
     <>
       <Toaster theme="dark" richColors position="bottom-center" />
+      <SceneHistoryPersistence />
       <CommandPalette />
       <SettingsDropZone>
         <AppLayout>

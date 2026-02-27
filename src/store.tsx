@@ -3,6 +3,8 @@ import { atom } from "jotai";
 import { splitAtom, atomWithStorage } from "jotai/utils";
 import { withBasePath } from "./utils/withBasePath";
 
+type SetStateAction<T> = T | ((prev: T) => T);
+
 export type Camera = {
   id: string;
   name: string;
@@ -97,7 +99,7 @@ export const pointerAtom = atom({
   normal: new THREE.Vector3(),
 });
 
-export const lightsAtom = atomWithStorage<Light[]>("lights", [
+const defaultLights: Light[] = [
   {
     name: `Light A`,
     id: THREE.MathUtils.generateUUID(),
@@ -120,7 +122,155 @@ export const lightsAtom = atomWithStorage<Light[]>("lights", [
     lightDistance: 0.3,
     lightPosition: { x: 0, y: 0 },
   },
-]);
+];
+
+const defaultCameras: Camera[] = [
+  {
+    id: "default",
+    name: "Default",
+    selected: true,
+    position: [0, 0, 5],
+    rotation: [0, 0, 0],
+  },
+];
+
+export type SceneSnapshot = {
+  version: 1;
+  lights: Light[];
+  cameras: Camera[];
+};
+
+type SceneHistoryState = {
+  entries: SceneSnapshot[];
+  index: number;
+  hydrated: boolean;
+};
+
+const SCENE_HISTORY_LIMIT = 100;
+
+function cloneSnapshot<T>(value: T): T {
+  return structuredClone(value);
+}
+
+function createSceneSnapshot(lights: Light[], cameras: Camera[]): SceneSnapshot {
+  return {
+    version: 1,
+    lights: cloneSnapshot(lights),
+    cameras: cloneSnapshot(cameras),
+  };
+}
+
+function snapshotsEqual(a: SceneSnapshot, b: SceneSnapshot): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function appendSceneHistory(
+  history: SceneHistoryState,
+  snapshot: SceneSnapshot
+): Pick<SceneHistoryState, "entries" | "index"> {
+  const current = history.entries[history.index];
+  if (current && snapshotsEqual(current, snapshot)) {
+    return {
+      entries: history.entries,
+      index: history.index,
+    };
+  }
+
+  const truncated = history.entries.slice(0, history.index + 1);
+  truncated.push(cloneSnapshot(snapshot));
+
+  if (truncated.length > SCENE_HISTORY_LIMIT) {
+    const trimmed = truncated.slice(truncated.length - SCENE_HISTORY_LIMIT);
+    return {
+      entries: trimmed,
+      index: trimmed.length - 1,
+    };
+  }
+
+  return {
+    entries: truncated,
+    index: truncated.length - 1,
+  };
+}
+
+function normalizeSceneHistory(
+  entries: SceneSnapshot[] | undefined,
+  index: number | undefined,
+  fallback: SceneSnapshot
+): Pick<SceneHistoryState, "entries" | "index"> {
+  if (!entries || entries.length === 0) {
+    return { entries: [fallback], index: 0 };
+  }
+
+  const trimmed = entries
+    .filter(
+      (entry): entry is SceneSnapshot =>
+        entry?.version === 1 &&
+        Array.isArray(entry.lights) &&
+        Array.isArray(entry.cameras)
+    )
+    .slice(-SCENE_HISTORY_LIMIT)
+    .map((entry) => createSceneSnapshot(entry.lights, entry.cameras));
+
+  if (trimmed.length === 0) {
+    return { entries: [fallback], index: 0 };
+  }
+
+  const rawIndex = typeof index === "number" ? index : trimmed.length - 1;
+  const maxIndex = trimmed.length - 1;
+  const clampedIndex = Math.min(Math.max(rawIndex, 0), maxIndex);
+
+  return {
+    entries: trimmed,
+    index: clampedIndex,
+  };
+}
+
+const defaultSceneSnapshot = createSceneSnapshot(defaultLights, defaultCameras);
+
+const lightsStateAtom = atom<Light[]>(cloneSnapshot(defaultLights));
+const camerasStateAtom = atom<Camera[]>(cloneSnapshot(defaultCameras));
+const isApplyingSceneSnapshotAtom = atom(false);
+const sceneDirtyAtom = atom(false);
+
+export const sceneHistoryAtom = atom<SceneHistoryState>({
+  entries: [defaultSceneSnapshot],
+  index: 0,
+  hydrated: false,
+});
+
+const pushSceneHistoryAtom = atom(
+  null,
+  (get, set, snapshot?: SceneSnapshot) => {
+    if (get(isApplyingSceneSnapshotAtom)) {
+      return;
+    }
+
+    const history = get(sceneHistoryAtom);
+    const nextSnapshot = snapshot
+      ? createSceneSnapshot(snapshot.lights, snapshot.cameras)
+      : createSceneSnapshot(get(lightsStateAtom), get(camerasStateAtom));
+    const next = appendSceneHistory(history, nextSnapshot);
+
+    set(sceneHistoryAtom, {
+      ...history,
+      ...next,
+    });
+  }
+);
+
+export const lightsAtom = atom(
+  (get) => get(lightsStateAtom),
+  (get, set, update: SetStateAction<Light[]>) => {
+    const previous = get(lightsStateAtom);
+    const next =
+      typeof update === "function"
+        ? (update as (prev: Light[]) => Light[])(previous)
+        : update;
+    set(lightsStateAtom, next);
+    set(sceneDirtyAtom, true);
+  }
+);
 
 export const lightIdsAtom = atom((get) => get(lightsAtom).map((l) => l.id));
 
@@ -232,15 +382,18 @@ export const deleteLightAtom = atom(null, (get, set, lightId: Light["id"]) => {
   }
 });
 
-export const camerasAtom = atomWithStorage<Camera[]>("cameras", [
-  {
-    id: "default",
-    name: "Default",
-    selected: true,
-    position: [0, 0, 5],
-    rotation: [0, 0, 0],
-  },
-]);
+export const camerasAtom = atom(
+  (get) => get(camerasStateAtom),
+  (get, set, update: SetStateAction<Camera[]>) => {
+    const previous = get(camerasStateAtom);
+    const next =
+      typeof update === "function"
+        ? (update as (prev: Camera[]) => Camera[])(previous)
+        : update;
+    set(camerasStateAtom, next);
+    set(sceneDirtyAtom, true);
+  }
+);
 
 export const cameraAtomsAtom = splitAtom(camerasAtom);
 
@@ -287,3 +440,102 @@ export const selectCameraAtom = atom(
     );
   }
 );
+
+export const canUndoSceneAtom = atom((get) => get(sceneHistoryAtom).index > 0);
+export const canRedoSceneAtom = atom((get) => {
+  const history = get(sceneHistoryAtom);
+  return history.index < history.entries.length - 1;
+});
+
+export const applySceneSnapshotAtom = atom(
+  null,
+  (get, set, snapshot: SceneSnapshot) => {
+    set(isApplyingSceneSnapshotAtom, true);
+    set(lightsStateAtom, cloneSnapshot(snapshot.lights));
+    set(camerasStateAtom, cloneSnapshot(snapshot.cameras));
+    set(isApplyingSceneSnapshotAtom, false);
+    set(sceneDirtyAtom, false);
+    set(pushSceneHistoryAtom, snapshot);
+  }
+);
+
+export const undoSceneAtom = atom(null, (get, set) => {
+  const history = get(sceneHistoryAtom);
+  if (history.index <= 0) {
+    return;
+  }
+
+  const nextIndex = history.index - 1;
+  const snapshot = history.entries[nextIndex];
+
+  set(isApplyingSceneSnapshotAtom, true);
+  set(lightsStateAtom, cloneSnapshot(snapshot.lights));
+  set(camerasStateAtom, cloneSnapshot(snapshot.cameras));
+  set(isApplyingSceneSnapshotAtom, false);
+  set(sceneDirtyAtom, false);
+  set(sceneHistoryAtom, {
+    ...history,
+    index: nextIndex,
+  });
+});
+
+export const redoSceneAtom = atom(null, (get, set) => {
+  const history = get(sceneHistoryAtom);
+  if (history.index >= history.entries.length - 1) {
+    return;
+  }
+
+  const nextIndex = history.index + 1;
+  const snapshot = history.entries[nextIndex];
+
+  set(isApplyingSceneSnapshotAtom, true);
+  set(lightsStateAtom, cloneSnapshot(snapshot.lights));
+  set(camerasStateAtom, cloneSnapshot(snapshot.cameras));
+  set(isApplyingSceneSnapshotAtom, false);
+  set(sceneDirtyAtom, false);
+  set(sceneHistoryAtom, {
+    ...history,
+    index: nextIndex,
+  });
+});
+
+export const hydrateSceneHistoryAtom = atom(
+  null,
+  (
+    get,
+    set,
+    payload: { entries: SceneSnapshot[]; index: number } | null | undefined
+  ) => {
+    const fallback = createSceneSnapshot(get(lightsStateAtom), get(camerasStateAtom));
+    const normalized = normalizeSceneHistory(
+      payload?.entries,
+      payload?.index,
+      fallback
+    );
+    const current = normalized.entries[normalized.index];
+
+    set(isApplyingSceneSnapshotAtom, true);
+    set(lightsStateAtom, cloneSnapshot(current.lights));
+    set(camerasStateAtom, cloneSnapshot(current.cameras));
+    set(isApplyingSceneSnapshotAtom, false);
+    set(sceneDirtyAtom, false);
+    set(sceneHistoryAtom, {
+      entries: normalized.entries,
+      index: normalized.index,
+      hydrated: true,
+    });
+  }
+);
+
+export const isSceneDirtyAtom = atom((get) => get(sceneDirtyAtom));
+
+export const commitSceneHistoryAtom = atom(null, (get, set) => {
+  const isDirty = get(sceneDirtyAtom);
+  if (!isDirty) {
+    return;
+  }
+
+  const snapshot = createSceneSnapshot(get(lightsStateAtom), get(camerasStateAtom));
+  set(sceneDirtyAtom, false);
+  set(pushSceneHistoryAtom, snapshot);
+});

@@ -1,5 +1,7 @@
 import {
   ArrowDownTrayIcon,
+  ArrowUturnLeftIcon,
+  ArrowUturnRightIcon,
   ArrowTopRightOnSquareIcon,
   CodeBracketIcon,
   PaintBrushIcon,
@@ -11,11 +13,15 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   activeModesAtom,
+  canRedoSceneAtom,
+  canUndoSceneAtom,
   camerasAtom,
   envMapTextureAtom,
   lightsAtom,
   modeAtom,
+  redoSceneAtom,
   sceneRendererAtom,
+  undoSceneAtom,
 } from "../../store";
 import {
   ExportResolution,
@@ -33,6 +39,10 @@ export function AppToolbar() {
   const renderer = useAtomValue(sceneRendererAtom);
   const lights = useAtomValue(lightsAtom);
   const cameras = useAtomValue(camerasAtom);
+  const canUndo = useAtomValue(canUndoSceneAtom);
+  const canRedo = useAtomValue(canRedoSceneAtom);
+  const undoScene = useSetAtom(undoSceneAtom);
+  const redoScene = useSetAtom(redoSceneAtom);
   const [resolution, setResolution] = useState<ExportResolution>("2k");
   const [isExporting, setIsExporting] = useState(false);
   const [showHint, setShowHint] = useState(false);
@@ -145,6 +155,24 @@ export function AppToolbar() {
       </Toolbar.ToggleGroup>
 
       <div className="flex items-center gap-2 ml-auto">
+        <button
+          className="flex items-center text-xs px-3 py-1.5 leading-4 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={() => undoScene()}
+          disabled={!canUndo}
+        >
+          <ArrowUturnLeftIcon className="w-4 h-4 mr-1.5" />
+          Undo
+        </button>
+
+        <button
+          className="flex items-center text-xs px-3 py-1.5 leading-4 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={() => redoScene()}
+          disabled={!canRedo}
+        >
+          <ArrowUturnRightIcon className="w-4 h-4 mr-1.5" />
+          Redo
+        </button>
+
         <label className="text-xs text-white/70">Export</label>
         <select
           className="h-8 rounded-md bg-neutral-900 ring-1 ring-white/20 px-2 text-xs uppercase tracking-wide"
