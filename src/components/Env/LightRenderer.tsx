@@ -37,11 +37,16 @@ export function LightRenderer({
   const size = useThree((state) => state.size);
   const bind = useGesture(
     {
-      onHover: ({ hovering }) => setHovered(hovering ?? false),
-      onClick: () => {
+      onHover: ({ hovering, event }) => {
+        event.stopPropagation();
+        setHovered(hovering ?? false);
+      },
+      onClick: ({ event }) => {
+        event.stopPropagation();
         selectLight(light.id);
       },
-      onDrag: ({ delta: [x, y] }) => {
+      onDrag: ({ delta: [x, y], event }) => {
+        event.stopPropagation();
         setLight((l) => {
           const lat = -y / (size.height / 2);
           const lon = x / (size.width / 2);
@@ -52,10 +57,14 @@ export function LightRenderer({
           };
         });
       },
-      onDragEnd: (e) => {
+      onDragEnd: ({ event }) => {
+        event.stopPropagation();
         selectLight(light.id);
       },
-      onWheel: ({ delta: [_, y], event: { altKey, metaKey } }) => {
+      onWheel: ({ delta: [_, y], event }) => {
+        event.stopPropagation();
+
+        const { altKey, metaKey } = event;
         if (!enableEvents) {
           return;
         }
