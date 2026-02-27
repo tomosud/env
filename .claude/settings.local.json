@@ -4,7 +4,8 @@
       "WebFetch(domain:github.com)",
       "Bash(gh auth:*)",
       "Bash(gh api:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(node_modules/.bin/tsc:*)"
     ]
   }
 }

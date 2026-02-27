@@ -1,8 +1,30 @@
 import * as THREE from "three";
 import convertCubemapToEquirectangular from "../components/HDRIPreview/convertCubemapToEquirectangular";
 import { encodeRGBE, HDRImageData } from "@derschmale/io-rgbe";
+import type { Light, Camera } from "../store";
 
 export type ExportResolution = "1k" | "2k" | "4k";
+
+export type SettingsSnapshot = {
+  version: 1;
+  lights: Light[];
+  cameras: Camera[];
+};
+
+export function getUniqueBasename(prefix = "envmap"): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const date = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+  const time = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  return `${prefix}_${date}_${time}`;
+}
+
+export function exportSettingsJSON(snapshot: SettingsSnapshot, basename: string): void {
+  const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
+    type: "application/json",
+  });
+  downloadBlob(blob, `${basename}.json`);
+}
 
 const resolutionMap: Record<ExportResolution, [number, number]> = {
   "1k": [1024, 512],

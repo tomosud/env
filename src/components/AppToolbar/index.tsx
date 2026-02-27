@@ -11,7 +11,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
   activeModesAtom,
+  camerasAtom,
   envMapTextureAtom,
+  lightsAtom,
   modeAtom,
   sceneRendererAtom,
 } from "../../store";
@@ -19,6 +21,8 @@ import {
   ExportResolution,
   exportEnvMapHDR,
   exportEnvMapPNG,
+  exportSettingsJSON,
+  getUniqueBasename,
 } from "../../utils/exportEnvMap";
 import { Logo } from "./Logo";
 
@@ -27,6 +31,8 @@ export function AppToolbar() {
   const activeModes = useAtomValue(activeModesAtom);
   const texture = useAtomValue(envMapTextureAtom);
   const renderer = useAtomValue(sceneRendererAtom);
+  const lights = useAtomValue(lightsAtom);
+  const cameras = useAtomValue(camerasAtom);
   const [resolution, setResolution] = useState<ExportResolution>("2k");
   const [isExporting, setIsExporting] = useState(false);
 
@@ -40,8 +46,10 @@ export function AppToolbar() {
 
     try {
       setIsExporting(true);
-      exportEnvMapHDR({ texture, renderer, resolution });
-      toast.success(`Saved HDR (${resolution})`);
+      const basename = getUniqueBasename("envmap");
+      exportEnvMapHDR({ texture, renderer, resolution, filename: `${basename}.hdr` });
+      exportSettingsJSON({ version: 1, lights, cameras }, basename);
+      toast.success(`Saved HDR + settings (${resolution})`);
     } catch (error) {
       console.error(error);
       toast.error("Failed to export HDR.");
@@ -58,8 +66,10 @@ export function AppToolbar() {
 
     try {
       setIsExporting(true);
-      await exportEnvMapPNG({ texture, renderer, resolution });
-      toast.success(`Saved PNG (${resolution})`);
+      const basename = getUniqueBasename("envmap");
+      await exportEnvMapPNG({ texture, renderer, resolution, filename: `${basename}.png` });
+      exportSettingsJSON({ version: 1, lights, cameras }, basename);
+      toast.success(`Saved PNG + settings (${resolution})`);
     } catch (error) {
       console.error(error);
       toast.error("Failed to export PNG.");
