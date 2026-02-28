@@ -216,7 +216,7 @@ export function AppToolbar() {
       </div>
 
       <Toolbar.Link
-        href="https://github.com/pmndrs/env"
+        href="https://github.com/tomosud/env"
         target="_blank"
         rel="noopener noreferrer"
         className="flex justify-center items-center text-xs px-3 py-1.5 leading-4 tracking-wide uppercase font-semibold bg-white/0 hover:bg-white/100 text-white hover:text-black rounded-md transition-all duration-500 ease-in-out"

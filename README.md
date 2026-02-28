@@ -8,6 +8,12 @@
   Create, edit, and preview HDR environment maps in the browser. Preview your models in realtime and export lightmaps to use in your React Three Fiber projects or in 3D applications like Blender, Cinema 4D, etc.
 </p>
 
+This repository is a fork of [pmndrs/env](https://github.com/pmndrs/env). Almost all of the original functionality remains intact, with additional export and workflow features layered on top.
+
+## Acknowledgements
+
+Thanks to the [pmndrs/env](https://github.com/pmndrs/env) maintainers and contributors for the original project and foundation this fork builds on.
+
 ## Features
 
 - Position and style your lights to fit the model
