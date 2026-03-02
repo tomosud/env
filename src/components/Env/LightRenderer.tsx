@@ -21,6 +21,7 @@ import { useGesture } from "@use-gesture/react";
 
 const SKY_GRADIENT_PICK_DISTANCE_OFFSET = 1_000_000;
 
+const defaultRaycast = THREE.Mesh.prototype.raycast;
 const disableRaycast: THREE.Mesh["raycast"] = () => undefined;
 
 const deprioritizedSkyGradientRaycast: THREE.Mesh["raycast"] = function (
@@ -194,7 +195,7 @@ export function LightRenderer({
       castShadow={false}
       receiveShadow={false}
       renderOrder={index}
-      raycast={light.visible ? undefined : disableRaycast}
+      raycast={light.visible ? defaultRaycast : disableRaycast}
       onClick={handleClick}
     >
       <planeGeometry args={[1, 1, 1, 1]} />
