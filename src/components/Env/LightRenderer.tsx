@@ -19,6 +19,23 @@ import { TextureLightMaterial } from "./TextureLightMaterial";
 import { latlonToPhiTheta } from "../../utils/coordinates";
 import { useGesture } from "@use-gesture/react";
 
+const SKY_GRADIENT_PICK_DISTANCE_OFFSET = 1_000_000;
+
+const disableRaycast: THREE.Mesh["raycast"] = () => undefined;
+
+const deprioritizedSkyGradientRaycast: THREE.Mesh["raycast"] = function (
+  this: THREE.Mesh,
+  raycaster,
+  intersects
+) {
+  const startIndex = intersects.length;
+  THREE.Mesh.prototype.raycast.call(this, raycaster, intersects);
+
+  for (let i = startIndex; i < intersects.length; i += 1) {
+    intersects[i].distance += SKY_GRADIENT_PICK_DISTANCE_OFFSET;
+  }
+};
+
 export function LightRenderer({
   index,
   lightAtom,
@@ -33,12 +50,15 @@ export function LightRenderer({
   const selectLight = useSetAtom(selectLightAtom);
   const lights = useAtomValue(lightsAtom);
   const selectedLightId = lights.find((l) => l.selected)?.id;
+  const visibleLightIds = new Set(
+    lights.filter((candidate) => candidate.visible).map((candidate) => candidate.id)
+  );
 
   const [hovered, setHovered] = useState(false);
   useCursor(hovered, "move", "default");
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
-    if (!enableEvents) {
+    if (!enableEvents || !light.visible) {
       return;
     }
 
@@ -46,7 +66,10 @@ export function LightRenderer({
       new Set(
         e.intersections
           .map((intersection) => intersection.object.userData?.lightId)
-          .filter((id): id is string => typeof id === "string")
+          .filter(
+            (id): id is string =>
+              typeof id === "string" && visibleLightIds.has(id)
+          )
       )
     );
 
@@ -146,11 +169,14 @@ export function LightRenderer({
   if (light.type === "sky_gradient") {
     return (
       <Sphere
+        userData={{ lightId: light.id }}
         visible={light.visible}
         args={[100, 64, 64]}
         castShadow={false}
         receiveShadow={false}
         renderOrder={index}
+        raycast={light.visible ? deprioritizedSkyGradientRaycast : disableRaycast}
+        onClick={handleClick}
       >
         <SkyGradientLightMaterial
           lightAtom={lightAtom as PrimitiveAtom<SkyGradientLight>}
@@ -168,6 +194,7 @@ export function LightRenderer({
       castShadow={false}
       receiveShadow={false}
       renderOrder={index}
+      raycast={light.visible ? undefined : disableRaycast}
       onClick={handleClick}
     >
       <planeGeometry args={[1, 1, 1, 1]} />

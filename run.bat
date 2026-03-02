@@ -45,7 +45,8 @@ if not exist ".yarn\install-state.gz" (
   )
 )
 
-start "" "http://localhost:%PORT%"
+start "env-browser-wait" powershell -NoProfile -Command ^
+  "$port=%PORT%; $ready=$false; for ($i=0; $i -lt 120; $i++) { if ((Test-NetConnection -ComputerName '127.0.0.1' -Port $port -InformationLevel Quiet) -eq $true) { $ready=$true; break }; Start-Sleep -Milliseconds 500 }; if ($ready) { Start-Process ('http://localhost:' + $port) }"
 call %PKG_CMD% dev --host 0.0.0.0 --port %PORT%
 
 endlocal
