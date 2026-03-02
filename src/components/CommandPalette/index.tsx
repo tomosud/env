@@ -186,6 +186,7 @@ function Item({
       solo: false,
       selected: false,
       opacity: 1,
+      additive: false,
       animate: false,
     };
 

@@ -81,6 +81,7 @@ export function SkyGradientLightMaterial({
     <skyGradientLightShaderMaterial
       ref={ref}
       transparent={true}
+      blending={light.additive ? THREE.AdditiveBlending : THREE.NormalBlending}
       depthFunc={THREE.AlwaysDepth}
       side={THREE.BackSide}
     />

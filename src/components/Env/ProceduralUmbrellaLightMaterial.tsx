@@ -95,6 +95,7 @@ export function ProceduralUmbrellaLightMaterial({
     <proceduralUmbrellaLightShaderMaterial
       ref={ref}
       transparent={true}
+      blending={light.additive ? THREE.AdditiveBlending : THREE.NormalBlending}
       depthFunc={THREE.AlwaysDepth}
     />
   );

@@ -104,6 +104,7 @@ export function LightProperties({
     pane.current
       .addBinding(light, "opacity", { min: 0, max: 1 })
       .on("change", handleChange);
+    pane.current.addBinding(light, "additive").on("change", handleChange);
 
     pane.current.addBlade({ view: "separator" });
 

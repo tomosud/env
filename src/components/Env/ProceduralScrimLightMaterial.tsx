@@ -148,6 +148,7 @@ export function ProceduralScrimLightMaterial({
     <proceduralScrimLightShaderMaterial
       ref={ref}
       transparent={true}
+      blending={light.additive ? THREE.AdditiveBlending : THREE.NormalBlending}
       depthFunc={THREE.AlwaysDepth}
     />
   );
