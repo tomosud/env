@@ -80,10 +80,20 @@ export const modeAtom = atomWithStorage("mode", {
   code: false,
 });
 
+export const imageBasenameAtom = atomWithStorage("image-basename", "envmap");
+export const jsonSaveFilenameAtom = atomWithStorage("json-save-filename", "");
+export const projectDirectoryHandleAtom = atom<FileSystemDirectoryHandle | null>(
+  null
+);
+
 export const activeModesAtom = atom((get) => {
   const mode = get(modeAtom);
   return Object.keys(mode).filter((key) => mode[key as keyof typeof mode]);
 });
+
+export const projectDirectoryNameAtom = atom(
+  (get) => get(projectDirectoryHandleAtom)?.name ?? null
+);
 
 export const isLightPaintingAtom = atom(false);
 

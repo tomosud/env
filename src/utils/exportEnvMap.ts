@@ -20,10 +20,22 @@ export function getUniqueBasename(prefix = "envmap"): string {
   return `${prefix}_${date}_${time}`;
 }
 
-export function exportSettingsJSON(snapshot: SettingsSnapshot, basename: string): void {
-  const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
+export function sanitizeBasename(basename: string, fallback = "envmap") {
+  const sanitized = basename
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
+    .replace(/[. ]+$/g, "");
+  return sanitized || fallback;
+}
+
+export function createSettingsJSONBlob(snapshot: SettingsSnapshot): Blob {
+  return new Blob([JSON.stringify(snapshot, null, 2)], {
     type: "application/json",
   });
+}
+
+export function exportSettingsJSON(snapshot: SettingsSnapshot, basename: string): void {
+  const blob = createSettingsJSONBlob(snapshot);
   downloadBlob(blob, `${basename}.json`);
 }
 
@@ -37,7 +49,7 @@ export function getResolutionSize(resolution: ExportResolution): [number, number
   return resolutionMap[resolution];
 }
 
-function downloadBlob(blob: Blob, filename: string) {
+export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.download = filename;
@@ -188,13 +200,22 @@ export function exportRGBFloatHDR({
   height: number;
   filename?: string;
 }) {
+  downloadBlob(createRGBFloatHDRBlob({ rgb, width, height }), filename);
+}
+
+export function createRGBFloatHDRBlob({
+  rgb,
+  width,
+  height,
+}: {
+  rgb: Float32Array;
+  width: number;
+  height: number;
+}) {
   const rgbeBytes = encodeRadianceHDR(rgb, width, height);
-  downloadBlob(
-    new Blob([rgbeBytes], {
-      type: "image/vnd.radiance",
-    }),
-    filename
-  );
+  return new Blob([rgbeBytes], {
+    type: "image/vnd.radiance",
+  });
 }
 
 export function exportRGBFloatEXR({
@@ -209,6 +230,28 @@ export function exportRGBFloatEXR({
   height: number;
   compression?: "none" | "zip";
   filename?: string;
+}) {
+  downloadBlob(
+    createRGBFloatEXRBlob({
+      rgb,
+      width,
+      height,
+      compression,
+    }),
+    filename
+  );
+}
+
+export function createRGBFloatEXRBlob({
+  rgb,
+  width,
+  height,
+  compression = "zip",
+}: {
+  rgb: Float32Array;
+  width: number;
+  height: number;
+  compression?: "none" | "zip";
 }) {
   const headerBytes: number[] = [];
   const pushU8 = (v: number) => headerBytes.push(v & 0xff);
@@ -379,12 +422,9 @@ export function exportRGBFloatEXR({
     dataOffset += 8 + block.payload.length;
   }
 
-  downloadBlob(
-    new Blob([out], {
-      type: "image/x-exr",
-    }),
-    filename
-  );
+  return new Blob([out], {
+    type: "image/x-exr",
+  });
 }
 
 export function exportEnvMapHDR({
@@ -397,6 +437,19 @@ export function exportEnvMapHDR({
   renderer: THREE.WebGLRenderer;
   resolution: ExportResolution;
   filename?: string;
+}) {
+  const blob = createEnvMapHDRBlob({ texture, renderer, resolution });
+  downloadBlob(blob, filename);
+}
+
+export function createEnvMapHDRBlob({
+  texture,
+  renderer,
+  resolution,
+}: {
+  texture: THREE.CubeTexture;
+  renderer: THREE.WebGLRenderer;
+  resolution: ExportResolution;
 }) {
   const [width, height] = getResolutionSize(resolution);
   const target = convertCubemapToEquirectangular(
@@ -413,7 +466,7 @@ export function exportEnvMapHDR({
   target.dispose();
 
   const rgb = rgbaToRgb(rgba);
-  exportRGBFloatHDR({ rgb, width, height, filename });
+  return createRGBFloatHDRBlob({ rgb, width, height });
 }
 
 export async function exportEnvMapPNG({
@@ -426,6 +479,19 @@ export async function exportEnvMapPNG({
   renderer: THREE.WebGLRenderer;
   resolution: ExportResolution;
   filename?: string;
+}) {
+  const blob = await createEnvMapPNGBlob({ texture, renderer, resolution });
+  downloadBlob(blob, filename);
+}
+
+export async function createEnvMapPNGBlob({
+  texture,
+  renderer,
+  resolution,
+}: {
+  texture: THREE.CubeTexture;
+  renderer: THREE.WebGLRenderer;
+  resolution: ExportResolution;
 }) {
   const [width, height] = getResolutionSize(resolution);
   const target = convertCubemapToEquirectangular(texture, renderer, width, height);
@@ -443,7 +509,7 @@ export async function exportEnvMapPNG({
   }
 
   context.putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0);
-  const blob = await new Promise<Blob>((resolve, reject) => {
+  return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((imageBlob) => {
       if (imageBlob) {
         resolve(imageBlob);
@@ -452,6 +518,4 @@ export async function exportEnvMapPNG({
       }
     }, "image/png");
   });
-
-  downloadBlob(blob, filename);
 }

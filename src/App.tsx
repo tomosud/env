@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Toaster, toast } from "sonner";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { AppContent } from "./components/AppContent";
 import { AppLayout } from "./components/AppLayout";
 import { AppToolbar } from "./components/AppToolbar";
@@ -13,6 +13,7 @@ import {
   iblRotationAtom,
   isSceneDirtyAtom,
   lightsAtom,
+  projectDirectoryHandleAtom,
   sceneHistoryAtom,
   type SceneSnapshot,
 } from "./store";
@@ -20,6 +21,7 @@ import type { SettingsSnapshot } from "./utils/exportEnvMap";
 import { idbGet, idbSet } from "./utils/indexedDb";
 
 const SCENE_HISTORY_KEY = "scene-history-v1";
+const PROJECT_DIRECTORY_HANDLE_KEY = "project-directory-handle-v1";
 
 function SceneHistoryPersistence() {
   const hydrateSceneHistory = useSetAtom(hydrateSceneHistoryAtom);
@@ -98,6 +100,53 @@ function SceneHistoryPersistence() {
       window.removeEventListener("beforeunload", flushCommit);
     };
   }, [history.hydrated, commitSceneHistory]);
+
+  return null;
+}
+
+function ProjectDirectoryPersistence() {
+  const [directoryHandle, setDirectoryHandle] = useAtom(projectDirectoryHandleAtom);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const saved = await idbGet<FileSystemDirectoryHandle | null>(
+          PROJECT_DIRECTORY_HANDLE_KEY
+        );
+        if (!cancelled) {
+          setDirectoryHandle((current) => current ?? saved ?? null);
+        }
+      } catch (error) {
+        console.warn("Failed to load project directory handle.", error);
+        if (!cancelled) {
+          setDirectoryHandle((current) => current);
+        }
+      } finally {
+        if (!cancelled) {
+          setHydrated(true);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setDirectoryHandle]);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
+    void idbSet(PROJECT_DIRECTORY_HANDLE_KEY, directoryHandle ?? null).catch(
+      (error) => {
+        console.warn("Failed to save project directory handle.", error);
+      }
+    );
+  }, [directoryHandle, hydrated]);
 
   return null;
 }
@@ -184,6 +233,7 @@ export default function App() {
     <>
       <Toaster theme="dark" richColors position="bottom-center" />
       <SceneHistoryPersistence />
+      <ProjectDirectoryPersistence />
       <CommandPalette />
       <SettingsDropZone>
         <AppLayout>

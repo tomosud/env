@@ -6,19 +6,27 @@ import { toast } from "sonner";
 import {
   camerasAtom,
   envMapTextureAtom,
+  imageBasenameAtom,
   iblRotationAtom,
   lightsAtom,
+  projectDirectoryHandleAtom,
   sceneHistoryAtom,
   sceneRendererAtom,
 } from "../../store";
 import {
   ExportResolution,
+  createRGBFloatEXRBlob,
+  createRGBFloatHDRBlob,
   exportRGBFloatEXR,
   exportRGBFloatHDR,
   exportSettingsJSON,
   getResolutionSize,
-  getUniqueBasename,
+  sanitizeBasename,
 } from "../../utils/exportEnvMap";
+import {
+  verifyDirectoryPermission,
+  writeFilesToDirectory,
+} from "../../utils/fileSystemAccess";
 import convertCubemapToEquirectangular from "../HDRIPreview/convertCubemapToEquirectangular";
 
 const PREVIEW_SIZE = 256;
@@ -295,6 +303,8 @@ export function IBLMatcapPanel() {
   const renderer = useAtomValue(sceneRendererAtom);
   const lights = useAtomValue(lightsAtom);
   const cameras = useAtomValue(camerasAtom);
+  const imageBasename = useAtomValue(imageBasenameAtom);
+  const projectDirectoryHandle = useAtomValue(projectDirectoryHandleAtom);
   const historyIndex = useAtomValue(sceneHistoryAtom).index;
   const [iblRotation, setIblRotation] = useAtom(iblRotationAtom);
   const [resolution, setResolution] = useState<ExportResolution>("2k");
@@ -302,6 +312,7 @@ export function IBLMatcapPanel() {
   const [isSavingHDR, setIsSavingHDR] = useState(false);
   const [isSavingEXR, setIsSavingEXR] = useState(false);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const normalizedImageBasename = sanitizeBasename(imageBasename, "envmap");
 
   const rotationDeg = useMemo(
     () => Math.round(THREE.MathUtils.radToDeg(iblRotation)),
@@ -311,6 +322,20 @@ export function IBLMatcapPanel() {
   const canSavePNG = !!texture && !!renderer && !isSavingPNG;
   const canSaveHDR = !!texture && !!renderer && !isSavingHDR;
   const canSaveEXR = !!texture && !!renderer && !isSavingEXR;
+
+  async function ensureProjectDirectoryPermission() {
+    if (!projectDirectoryHandle) {
+      return null;
+    }
+
+    const granted = await verifyDirectoryPermission(projectDirectoryHandle, true);
+    if (!granted) {
+      toast.error("Folder permission is required to save files.");
+      return null;
+    }
+
+    return projectDirectoryHandle;
+  }
 
   const redrawPreview = useCallback(async () => {
     if (!texture || !renderer || !previewCanvasRef.current) {
@@ -396,8 +421,25 @@ export function IBLMatcapPanel() {
           }
         }, "image/png");
       });
-      downloadBlob(blob, `${getUniqueBasename("matcap")}.png`);
-      toast.success(`Saved matcap PNG (${outputSize}x${outputSize}).`);
+      if (projectDirectoryHandle) {
+        const directoryHandle = await ensureProjectDirectoryPermission();
+        if (!directoryHandle) {
+          return;
+        }
+
+        await writeFilesToDirectory(directoryHandle, [
+          {
+            filename: `${normalizedImageBasename}_matcap.png`,
+            blob,
+          },
+        ]);
+        toast.success(
+          `Saved ${normalizedImageBasename}_matcap.png to ${directoryHandle.name}.`
+        );
+      } else {
+        downloadBlob(blob, `${normalizedImageBasename}_matcap.png`);
+        toast.success(`Saved matcap PNG (${outputSize}x${outputSize}).`);
+      }
     } catch (error) {
       console.error(error);
       toast.error("Failed to save matcap preview.");
@@ -406,7 +448,7 @@ export function IBLMatcapPanel() {
     }
   }
 
-  function handleSaveHDR() {
+  async function handleSaveHDR() {
     if (!texture || !renderer) {
       toast.error("Environment map is not ready yet.");
       return;
@@ -428,15 +470,38 @@ export function IBLMatcapPanel() {
         sampleHeight,
         outputSize
       );
-      const basename = getUniqueBasename("matcap");
-      exportRGBFloatHDR({
-        rgb: matcapRGB,
-        width: outputSize,
-        height: outputSize,
-        filename: `${basename}.hdr`,
-      });
-      exportSettingsJSON({ version: 1, lights, cameras, iblRotation }, basename);
-      toast.success(`Saved matcap HDR + settings (${outputSize}x${outputSize})`);
+      if (projectDirectoryHandle) {
+        const directoryHandle = await ensureProjectDirectoryPermission();
+        if (!directoryHandle) {
+          return;
+        }
+
+        await writeFilesToDirectory(directoryHandle, [
+          {
+            filename: `${normalizedImageBasename}_matcap.hdr`,
+            blob: createRGBFloatHDRBlob({
+              rgb: matcapRGB,
+              width: outputSize,
+              height: outputSize,
+            }),
+          },
+        ]);
+        toast.success(
+          `Saved ${normalizedImageBasename}_matcap.hdr to ${directoryHandle.name}`
+        );
+      } else {
+        exportRGBFloatHDR({
+          rgb: matcapRGB,
+          width: outputSize,
+          height: outputSize,
+          filename: `${normalizedImageBasename}_matcap.hdr`,
+        });
+        exportSettingsJSON(
+          { version: 1, lights, cameras, iblRotation },
+          normalizedImageBasename
+        );
+        toast.success(`Saved matcap HDR + settings (${outputSize}x${outputSize})`);
+      }
     } catch (error) {
       console.error(error);
       toast.error("Failed to export HDR.");
@@ -445,7 +510,7 @@ export function IBLMatcapPanel() {
     }
   }
 
-  function handleSaveEXR() {
+  async function handleSaveEXR() {
     if (!texture || !renderer) {
       toast.error("Environment map is not ready yet.");
       return;
@@ -467,15 +532,38 @@ export function IBLMatcapPanel() {
         sampleHeight,
         outputSize
       );
-      const basename = getUniqueBasename("matcap");
-      exportRGBFloatEXR({
-        rgb: matcapRGB,
-        width: outputSize,
-        height: outputSize,
-        filename: `${basename}.exr`,
-      });
-      exportSettingsJSON({ version: 1, lights, cameras, iblRotation }, basename);
-      toast.success(`Saved matcap EXR + settings (${outputSize}x${outputSize})`);
+      if (projectDirectoryHandle) {
+        const directoryHandle = await ensureProjectDirectoryPermission();
+        if (!directoryHandle) {
+          return;
+        }
+
+        await writeFilesToDirectory(directoryHandle, [
+          {
+            filename: `${normalizedImageBasename}_matcap.exr`,
+            blob: createRGBFloatEXRBlob({
+              rgb: matcapRGB,
+              width: outputSize,
+              height: outputSize,
+            }),
+          },
+        ]);
+        toast.success(
+          `Saved ${normalizedImageBasename}_matcap.exr to ${directoryHandle.name}`
+        );
+      } else {
+        exportRGBFloatEXR({
+          rgb: matcapRGB,
+          width: outputSize,
+          height: outputSize,
+          filename: `${normalizedImageBasename}_matcap.exr`,
+        });
+        exportSettingsJSON(
+          { version: 1, lights, cameras, iblRotation },
+          normalizedImageBasename
+        );
+        toast.success(`Saved matcap EXR + settings (${outputSize}x${outputSize})`);
+      }
     } catch (error) {
       console.error(error);
       toast.error("Failed to export EXR.");
