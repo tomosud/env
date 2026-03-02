@@ -10,6 +10,35 @@ import { envMapTextureAtom, sceneRendererAtom } from "../../store";
 const zero = new THREE.Vector3(0, 0, 0);
 const dir = new THREE.Vector3(0, 0, 0);
 
+function getEventOffsets(event: Event) {
+  const pointerEvent = event as Event &
+    Partial<Pick<MouseEvent, "clientX" | "clientY" | "offsetX" | "offsetY">> & {
+      currentTarget?: EventTarget | null;
+      target?: EventTarget | null;
+    };
+  const eventTarget =
+    pointerEvent.currentTarget ?? pointerEvent.target ?? undefined;
+  const element =
+    eventTarget instanceof Element ? (eventTarget as HTMLElement) : undefined;
+  const rect = element?.getBoundingClientRect?.();
+
+  if (
+    rect &&
+    typeof pointerEvent.clientX === "number" &&
+    typeof pointerEvent.clientY === "number"
+  ) {
+    return {
+      x: pointerEvent.clientX - rect.left,
+      y: pointerEvent.clientY - rect.top,
+    };
+  }
+
+  return {
+    x: pointerEvent.offsetX ?? 0,
+    y: pointerEvent.offsetY ?? 0,
+  };
+}
+
 export function EnvMapPlane() {
   const ref = useRef<THREE.Mesh>(null!);
   const lastTextureRef = useRef<THREE.CubeTexture | null>(null);
@@ -40,9 +69,10 @@ export function EnvMapPlane() {
   });
 
   const compute: ComputeFunction = (event, state) => {
+    const { x, y } = getEventOffsets(event);
     state.pointer.set(
-      (event.offsetX / state.size.width) * 2 - 1,
-      -(event.offsetY / state.size.height) * 2 + 1
+      (x / state.size.width) * 2 - 1,
+      -(y / state.size.height) * 2 + 1
     );
     state.raycaster.setFromCamera(state.pointer, state.camera);
 

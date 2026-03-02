@@ -78,6 +78,12 @@ export function LightRenderer({
       return;
     }
 
+    if (hitLightIds.length === 1 && hitLightIds[0] === light.id) {
+      e.stopPropagation();
+      selectLight(light.id);
+      return;
+    }
+
     const selectedHitIndex = selectedLightId
       ? hitLightIds.indexOf(selectedLightId)
       : -1;
