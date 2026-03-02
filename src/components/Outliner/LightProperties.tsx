@@ -99,7 +99,7 @@ export function LightProperties({
 
     pane.current.addBinding(light, "color").on("change", handleChange);
     pane.current
-      .addBinding(light, "intensity", { min: 0, max: 20, step: 0.1 })
+      .addBinding(light, "intensity", { min: 0, max: 100, step: 0.1 })
       .on("change", handleChange);
     pane.current
       .addBinding(light, "opacity", { min: 0, max: 1 })
