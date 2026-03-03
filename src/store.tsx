@@ -1,77 +1,223 @@
 import * as THREE from "three";
 import { atom } from "jotai";
-import { splitAtom, atomWithStorage } from "jotai/utils";
+import { atomWithStorage, splitAtom } from "jotai/utils";
+import type {
+  SceneCamera,
+  SceneLight,
+  SceneSnapshot,
+} from "./utils/sceneSnapshot";
+import { createSceneSnapshot, parseSceneSnapshot } from "./utils/sceneSnapshot";
 import { withBasePath } from "./utils/withBasePath";
 
 type SetStateAction<T> = T | ((prev: T) => T);
 
-export type Camera = {
-  id: string;
-  name: string;
+type LightUiState = {
   selected: boolean;
-  position: [number, number, number];
-  rotation: [number, number, number];
-};
-
-type BaseLight = {
-  id: string;
-  ts: number;
-  name: string;
-
-  shape: "rect" | "circle" | "ring";
-  intensity: number;
-  opacity: number;
-  additive: boolean;
-
-  scale: number;
-  scaleX: number;
-  scaleY: number;
-  rotation: number;
-
-  latlon: { x: number; y: number };
-  target: { x: number; y: number; z: number };
-
-  selected: boolean;
-  visible: boolean;
   solo: boolean;
-
-  animate: boolean;
-  animationSpeed?: number;
-  animationRotationIntensity?: number;
-  animationFloatIntensity?: number;
-  animationFloatingRange?: [number, number];
 };
 
-export type TextureLight = BaseLight & {
-  type: "texture";
-  color: string;
-  map: string;
+type CameraUiState = {
+  selected: boolean;
 };
 
-export type ProceduralScrimLight = BaseLight & {
-  type: "procedural_scrim";
-  color: string;
-  lightPosition: { x: number; y: number };
-  lightDistance: number;
+export type Camera = SceneCamera & CameraUiState;
+export type Light = SceneLight & LightUiState;
+
+export type TextureLight = Extract<Light, { type: "texture" }>;
+export type ProceduralScrimLight = Extract<Light, { type: "procedural_scrim" }>;
+export type ProceduralUmbrellaLight = Extract<
+  Light,
+  { type: "procedural_umbrella" }
+>;
+export type SkyGradientLight = Extract<Light, { type: "sky_gradient" }>;
+
+type SceneHistoryState = {
+  entries: SceneSnapshot[];
+  index: number;
+  hydrated: boolean;
 };
 
-export type ProceduralUmbrellaLight = BaseLight & {
-  type: "procedural_umbrella";
-  color: string;
-  lightSides: number;
-};
+const SCENE_HISTORY_LIMIT = 100;
 
-export type SkyGradientLight = BaseLight & {
-  type: "sky_gradient";
-  color: string;
-  color2: string;
-};
+const defaultLightsData: SceneLight[] = [
+  {
+    name: "Light A",
+    id: THREE.MathUtils.generateUUID(),
+    shape: "rect",
+    type: "procedural_scrim",
+    color: "#ffffff",
+    latlon: { x: 0, y: 0 },
+    intensity: 1,
+    rotation: 0,
+    scale: 2,
+    scaleX: 1,
+    scaleY: 1,
+    target: { x: 0, y: 0, z: 0 },
+    visible: true,
+    opacity: 1,
+    additive: false,
+    animate: false,
+    lightDistance: 0.3,
+    lightPosition: { x: 0, y: 0 },
+  },
+];
 
-export type Light =
-  | TextureLight
-  | ProceduralScrimLight
-  | ProceduralUmbrellaLight
-  | SkyGradientLight;
+const defaultCamerasData: SceneCamera[] = [
+  {
+    id: "default",
+    name: "Default",
+    position: [0, 0, 5],
+    rotation: [0, 0, 0],
+  },
+];
+
+function cloneSnapshot<T>(value: T): T {
+  return structuredClone(value);
+}
+
+function stripLightUiState(light: Light): SceneLight {
+  const { selected: _selected, solo: _solo, ...sceneLight } = light;
+  return sceneLight;
+}
+
+function stripCameraUiState(camera: Camera): SceneCamera {
+  const { selected: _selected, ...sceneCamera } = camera;
+  return sceneCamera;
+}
+
+function combineLights(
+  lights: SceneLight[],
+  selectedLightId: string | null,
+  soloLightId: string | null
+): Light[] {
+  return lights.map((light) => ({
+    ...light,
+    selected: light.id === selectedLightId,
+    solo: light.id === soloLightId,
+  }));
+}
+
+function combineCameras(
+  cameras: SceneCamera[],
+  selectedCameraId: string
+): Camera[] {
+  const fallbackId = cameras[0]?.id ?? "default";
+  const activeCameraId = cameras.some((camera) => camera.id === selectedCameraId)
+    ? selectedCameraId
+    : fallbackId;
+
+  return cameras.map((camera) => ({
+    ...camera,
+    selected: camera.id === activeCameraId,
+  }));
+}
+
+function splitLights(lights: Light[]) {
+  return {
+    lightsData: lights.map(stripLightUiState),
+    selectedLightId: lights.find((light) => light.selected)?.id ?? null,
+    soloLightId: lights.find((light) => light.solo)?.id ?? null,
+  };
+}
+
+function splitCameras(cameras: Camera[]) {
+  return {
+    camerasData: cameras.map(stripCameraUiState),
+    selectedCameraId: cameras.find((camera) => camera.selected)?.id ?? null,
+  };
+}
+
+function normalizeSceneHistory(
+  entries: unknown[] | undefined,
+  index: number | undefined,
+  fallback: SceneSnapshot
+): Pick<SceneHistoryState, "entries" | "index"> {
+  const normalizedEntries = (entries ?? [])
+    .map((entry) => parseSceneSnapshot(entry))
+    .filter((entry): entry is SceneSnapshot => entry !== null)
+    .slice(-SCENE_HISTORY_LIMIT);
+
+  if (normalizedEntries.length === 0) {
+    return { entries: [fallback], index: 0 };
+  }
+
+  const rawIndex =
+    typeof index === "number" && Number.isFinite(index)
+      ? Math.trunc(index)
+      : normalizedEntries.length - 1;
+  const clampedIndex = Math.min(
+    Math.max(rawIndex, 0),
+    normalizedEntries.length - 1
+  );
+
+  return {
+    entries: normalizedEntries,
+    index: clampedIndex,
+  };
+}
+
+function snapshotsEqual(a: SceneSnapshot, b: SceneSnapshot): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function appendSceneHistory(
+  history: SceneHistoryState,
+  snapshot: SceneSnapshot
+): Pick<SceneHistoryState, "entries" | "index"> {
+  const current = history.entries[history.index];
+  if (current && snapshotsEqual(current, snapshot)) {
+    return {
+      entries: history.entries,
+      index: history.index,
+    };
+  }
+
+  const truncated = history.entries.slice(0, history.index + 1);
+  truncated.push(cloneSnapshot(snapshot));
+
+  if (truncated.length > SCENE_HISTORY_LIMIT) {
+    const trimmed = truncated.slice(truncated.length - SCENE_HISTORY_LIMIT);
+    return {
+      entries: trimmed,
+      index: trimmed.length - 1,
+    };
+  }
+
+  return {
+    entries: truncated,
+    index: truncated.length - 1,
+  };
+}
+
+function lightExists(lights: SceneLight[], lightId: string | null) {
+  return !!lightId && lights.some((light) => light.id === lightId);
+}
+
+function cameraExists(cameras: SceneCamera[], cameraId: string | null) {
+  return !!cameraId && cameras.some((camera) => camera.id === cameraId);
+}
+
+const defaultSceneSnapshot = createSceneSnapshot(
+  defaultLightsData,
+  defaultCamerasData,
+  defaultCamerasData[0].id,
+  0
+);
+
+const lightsDataStateAtom = atom<SceneLight[]>(
+  cloneSnapshot(defaultSceneSnapshot.lights)
+);
+const selectedLightIdStateAtom = atom<string | null>(null);
+const soloLightIdStateAtom = atom<string | null>(null);
+const camerasDataStateAtom = atom<SceneCamera[]>(
+  cloneSnapshot(defaultSceneSnapshot.cameras)
+);
+const selectedCameraIdStateAtom = atom<string>(defaultSceneSnapshot.activeCameraId);
+const iblRotationStateAtom = atom<number>(0);
+const isApplyingSceneSnapshotAtom = atom(false);
+const sceneDirtyAtom = atom(false);
+
+export { createSceneSnapshot, type SceneSnapshot };
 
 export const debugAtom = atom(false);
 
@@ -110,279 +256,115 @@ export const pointerAtom = atom({
   normal: new THREE.Vector3(),
 });
 
-const defaultLights: Light[] = [
-  {
-    name: `Light A`,
-    id: THREE.MathUtils.generateUUID(),
-    ts: Date.now(),
-    shape: "rect",
-    type: "procedural_scrim",
-    color: "#fff",
-    latlon: { x: 0, y: 0 },
-    intensity: 1,
-    rotation: 0,
-    scale: 2,
-    scaleX: 1,
-    scaleY: 1,
-    target: { x: 0, y: 0, z: 0 },
-    selected: false,
-    visible: true,
-    solo: false,
-    opacity: 1,
-    additive: false,
-    animate: false,
-    lightDistance: 0.3,
-    lightPosition: { x: 0, y: 0 },
-  },
-];
-
-const defaultCameras: Camera[] = [
-  {
-    id: "default",
-    name: "Default",
-    selected: true,
-    position: [0, 0, 5],
-    rotation: [0, 0, 0],
-  },
-];
-
-export type SceneSnapshot = {
-  version: 1;
-  lights: Light[];
-  cameras: Camera[];
-  iblRotation: number;
-};
-
-type SceneHistoryState = {
-  entries: SceneSnapshot[];
-  index: number;
-  hydrated: boolean;
-};
-
-const SCENE_HISTORY_LIMIT = 100;
-
-function cloneSnapshot<T>(value: T): T {
-  return structuredClone(value);
-}
-
-function createSceneSnapshot(
-  lights: Light[],
-  cameras: Camera[],
-  iblRotation: number
-): SceneSnapshot {
-  return {
-    version: 1,
-    lights: cloneSnapshot(normalizeLights(lights)),
-    cameras: cloneSnapshot(cameras),
-    iblRotation,
-  };
-}
-
-function normalizeLight(light: Light): Light {
-  return {
-    ...light,
-    additive: typeof light.additive === "boolean" ? light.additive : false,
-  };
-}
-
-function normalizeLights(lights: Light[]): Light[] {
-  return lights.map(normalizeLight);
-}
-
-function snapshotsEqual(a: SceneSnapshot, b: SceneSnapshot): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
-
-function appendSceneHistory(
-  history: SceneHistoryState,
-  snapshot: SceneSnapshot
-): Pick<SceneHistoryState, "entries" | "index"> {
-  const current = history.entries[history.index];
-  if (current && snapshotsEqual(current, snapshot)) {
-    return {
-      entries: history.entries,
-      index: history.index,
-    };
-  }
-
-  const truncated = history.entries.slice(0, history.index + 1);
-  truncated.push(cloneSnapshot(snapshot));
-
-  if (truncated.length > SCENE_HISTORY_LIMIT) {
-    const trimmed = truncated.slice(truncated.length - SCENE_HISTORY_LIMIT);
-    return {
-      entries: trimmed,
-      index: trimmed.length - 1,
-    };
-  }
-
-  return {
-    entries: truncated,
-    index: truncated.length - 1,
-  };
-}
-
-function normalizeSceneHistory(
-  entries: SceneSnapshot[] | undefined,
-  index: number | undefined,
-  fallback: SceneSnapshot
-): Pick<SceneHistoryState, "entries" | "index"> {
-  if (!entries || entries.length === 0) {
-    return { entries: [fallback], index: 0 };
-  }
-
-  const trimmed = entries
-    .filter(
-      (entry): entry is SceneSnapshot =>
-        entry?.version === 1 &&
-        Array.isArray(entry.lights) &&
-        Array.isArray(entry.cameras)
-    )
-    .slice(-SCENE_HISTORY_LIMIT)
-    .map((entry) =>
-      createSceneSnapshot(
-        entry.lights,
-        entry.cameras,
-        typeof entry.iblRotation === "number" ? entry.iblRotation : 0
-      )
-    );
-
-  if (trimmed.length === 0) {
-    return { entries: [fallback], index: 0 };
-  }
-
-  const rawIndex = typeof index === "number" ? index : trimmed.length - 1;
-  const maxIndex = trimmed.length - 1;
-  const clampedIndex = Math.min(Math.max(rawIndex, 0), maxIndex);
-
-  return {
-    entries: trimmed,
-    index: clampedIndex,
-  };
-}
-
-const defaultSceneSnapshot = createSceneSnapshot(defaultLights, defaultCameras, 0);
-
-const lightsStateAtom = atom<Light[]>(cloneSnapshot(defaultLights));
-const camerasStateAtom = atom<Camera[]>(cloneSnapshot(defaultCameras));
-const iblRotationStateAtom = atom<number>(0);
-const isApplyingSceneSnapshotAtom = atom(false);
-const sceneDirtyAtom = atom(false);
-
 export const sceneHistoryAtom = atom<SceneHistoryState>({
   entries: [defaultSceneSnapshot],
   index: 0,
   hydrated: false,
 });
 
-const pushSceneHistoryAtom = atom(
-  null,
-  (get, set, snapshot?: SceneSnapshot) => {
-    if (get(isApplyingSceneSnapshotAtom)) {
-      return;
-    }
-
-    const history = get(sceneHistoryAtom);
-    const nextSnapshot = snapshot
-      ? createSceneSnapshot(
-          snapshot.lights,
-          snapshot.cameras,
-          snapshot.iblRotation
-        )
-      : createSceneSnapshot(
-          get(lightsStateAtom),
-          get(camerasStateAtom),
-          get(iblRotationStateAtom)
-        );
-    const next = appendSceneHistory(history, nextSnapshot);
-
-    set(sceneHistoryAtom, {
-      ...history,
-      ...next,
-    });
-  }
+export const currentSceneSnapshotAtom = atom((get) =>
+  createSceneSnapshot(
+    get(lightsDataStateAtom),
+    get(camerasDataStateAtom),
+    get(selectedCameraIdStateAtom),
+    get(iblRotationStateAtom)
+  )
 );
 
+const pushSceneHistoryAtom = atom(null, (get, set, snapshot?: SceneSnapshot) => {
+  if (get(isApplyingSceneSnapshotAtom)) {
+    return;
+  }
+
+  const history = get(sceneHistoryAtom);
+  const nextSnapshot = snapshot ?? get(currentSceneSnapshotAtom);
+  const next = appendSceneHistory(history, nextSnapshot);
+
+  set(sceneHistoryAtom, {
+    ...history,
+    ...next,
+  });
+});
+
 export const lightsAtom = atom(
-  (get) => get(lightsStateAtom),
+  (get) =>
+    combineLights(
+      get(lightsDataStateAtom),
+      get(selectedLightIdStateAtom),
+      get(soloLightIdStateAtom)
+    ),
   (get, set, update: SetStateAction<Light[]>) => {
-    const previous = get(lightsStateAtom);
+    const previous = get(lightsAtom);
     const next =
       typeof update === "function"
         ? (update as (prev: Light[]) => Light[])(previous)
         : update;
-    set(lightsStateAtom, normalizeLights(next));
+    const nextState = splitLights(next);
+    const normalizedSnapshot = createSceneSnapshot(
+      nextState.lightsData,
+      get(camerasDataStateAtom),
+      get(selectedCameraIdStateAtom),
+      get(iblRotationStateAtom)
+    );
+
+    set(lightsDataStateAtom, normalizedSnapshot.lights);
+    set(
+      selectedLightIdStateAtom,
+      lightExists(normalizedSnapshot.lights, nextState.selectedLightId)
+        ? nextState.selectedLightId
+        : null
+    );
+    set(
+      soloLightIdStateAtom,
+      lightExists(normalizedSnapshot.lights, nextState.soloLightId)
+        ? nextState.soloLightId
+        : null
+    );
     set(sceneDirtyAtom, true);
   }
 );
 
-export const lightIdsAtom = atom((get) => get(lightsAtom).map((l) => l.id));
+export const lightIdsAtom = atom((get) => get(lightsAtom).map((light) => light.id));
 
 export const lightAtomsAtom = splitAtom(lightsAtom);
 
-export const isSoloAtom = atom((get) => {
-  const lights = get(lightsAtom);
-  return lights.length > 0 && lights.some((l) => l.solo);
-});
+export const isSoloAtom = atom((get) => get(soloLightIdStateAtom) !== null);
 
-export const isLightSelectedAtom = atom((get) => {
-  const lights = get(lightsAtom);
-  return lights.length > 0 && lights.some((l) => l.selected);
-});
+export const isLightSelectedAtom = atom(
+  (get) => get(selectedLightIdStateAtom) !== null
+);
 
 export const selectLightAtom = atom(null, (get, set, lightId: Light["id"]) => {
-  set(lightsAtom, (lights) =>
-    lights.map((l) => ({
-      ...l,
-      selected: l.id === lightId,
-    }))
-  );
+  if (!lightExists(get(lightsDataStateAtom), lightId)) {
+    return;
+  }
+  set(selectedLightIdStateAtom, lightId);
 });
 
-export const deselectLightsAtom = atom(null, (get, set) => {
-  set(lightsAtom, (lights) =>
-    lights.map((l) => ({
-      ...l,
-      selected: false,
-    }))
-  );
+export const deselectLightsAtom = atom(null, (_get, set) => {
+  set(selectedLightIdStateAtom, null);
 });
 
 export const toggleSoloAtom = atom(null, (get, set, lightId: Light["id"]) => {
-  const lights = get(lightsAtom);
-  const light = lights.find((l) => l.id === lightId)!;
-  const isSolo = get(isSoloAtom);
-
-  if (isSolo && light.solo) {
-    set(
-      lightsAtom,
-      lights.map((l) => ({
-        ...l,
-        solo: false,
-        visible: true,
-      }))
-    );
-  } else {
-    set(
-      lightsAtom,
-      lights.map((l) => ({
-        ...l,
-        solo: l.id === lightId,
-        visible: l.id === lightId,
-        selected: l.id === lightId,
-      }))
-    );
+  if (!lightExists(get(lightsDataStateAtom), lightId)) {
+    return;
   }
+
+  const currentSolo = get(soloLightIdStateAtom);
+  set(soloLightIdStateAtom, currentSolo === lightId ? null : lightId);
+  set(selectedLightIdStateAtom, lightId);
 });
 
 export const toggleLightSelectionAtom = atom(
   null,
   (get, set, lightId: Light["id"]) => {
-    set(lightsAtom, (lights) =>
-      lights.map((l) => ({
-        ...l,
-        selected: l.id === lightId ? !l.selected : false,
-      }))
+    if (!lightExists(get(lightsDataStateAtom), lightId)) {
+      return;
+    }
+
+    set(
+      selectedLightIdStateAtom,
+      get(selectedLightIdStateAtom) === lightId ? null : lightId
     );
   }
 );
@@ -390,58 +372,69 @@ export const toggleLightSelectionAtom = atom(
 export const duplicateLightAtom = atom(
   null,
   (get, set, lightId: Light["id"]) => {
-    const lights = get(lightsAtom);
-    const light = lights.find((l) => l.id === lightId)!;
-    const isSolo = get(isSoloAtom);
-    const newLight = {
+    const lights = get(lightsDataStateAtom);
+    const light = lights.find((entry) => entry.id === lightId);
+    if (!light) {
+      return;
+    }
+
+    const newLight: SceneLight = {
       ...structuredClone(light),
-      visible: isSolo ? false : light.visible,
-      solo: false,
-      selected: false,
       id: THREE.MathUtils.generateUUID(),
       name: `${light.name} (copy)`,
     };
-    set(lightsAtom, [...lights, newLight]);
+
+    set(lightsDataStateAtom, [...lights, newLight]);
+    set(sceneDirtyAtom, true);
   }
 );
 
 export const deleteLightAtom = atom(null, (get, set, lightId: Light["id"]) => {
-  const lights = get(lightsAtom);
-  const light = lights.find((l) => l.id === lightId)!;
-  const isSolo = get(isSoloAtom);
-
-  const newLights = lights.filter((l) => l.id !== lightId);
-
-  if (isSolo && light.solo) {
-    set(
-      lightsAtom,
-      newLights.map((l) => ({
-        ...l,
-        solo: false,
-        visible: true,
-      }))
-    );
-  } else {
-    set(lightsAtom, newLights);
+  const lights = get(lightsDataStateAtom);
+  if (!lights.some((light) => light.id === lightId)) {
+    return;
   }
+
+  const nextLights = lights.filter((light) => light.id !== lightId);
+  set(lightsDataStateAtom, nextLights);
+
+  if (get(selectedLightIdStateAtom) === lightId) {
+    set(selectedLightIdStateAtom, null);
+  }
+  if (get(soloLightIdStateAtom) === lightId) {
+    set(soloLightIdStateAtom, null);
+  }
+
+  set(sceneDirtyAtom, true);
 });
 
 export const camerasAtom = atom(
-  (get) => get(camerasStateAtom),
+  (get) => combineCameras(get(camerasDataStateAtom), get(selectedCameraIdStateAtom)),
   (get, set, update: SetStateAction<Camera[]>) => {
-    const previous = get(camerasStateAtom);
+    const previous = get(camerasAtom);
     const next =
       typeof update === "function"
         ? (update as (prev: Camera[]) => Camera[])(previous)
         : update;
-    set(camerasStateAtom, next);
+    const nextState = splitCameras(next);
+    const normalizedSnapshot = createSceneSnapshot(
+      get(lightsDataStateAtom),
+      nextState.camerasData,
+      cameraExists(nextState.camerasData, nextState.selectedCameraId)
+        ? nextState.selectedCameraId!
+        : get(selectedCameraIdStateAtom),
+      get(iblRotationStateAtom)
+    );
+
+    set(camerasDataStateAtom, normalizedSnapshot.cameras);
+    set(selectedCameraIdStateAtom, normalizedSnapshot.activeCameraId);
     set(sceneDirtyAtom, true);
   }
 );
 
 export const iblRotationAtom = atom(
   (get) => get(iblRotationStateAtom),
-  (get, set, value: number) => {
+  (_get, set, value: number) => {
     set(iblRotationStateAtom, value);
     set(sceneDirtyAtom, true);
   }
@@ -452,44 +445,48 @@ export const cameraAtomsAtom = splitAtom(camerasAtom);
 export const selectedCameraAtom = atom(
   (get) => {
     const cameras = get(camerasAtom);
-    return cameras.find((c) => c.selected)!;
+    return cameras.find((camera) => camera.selected) ?? cameras[0];
   },
   (get, set, value: Partial<Camera>) => {
-    const cameras = get(camerasAtom);
-    const selectedCamera = cameras.find((c) => c.selected)!;
+    const selectedCameraId = get(selectedCameraIdStateAtom);
     set(
       camerasAtom,
-      cameras.map((c) => (c.id === selectedCamera.id ? { ...c, ...value } : c))
+      get(camerasAtom).map((camera) =>
+        camera.id === selectedCameraId ? { ...camera, ...value } : camera
+      )
     );
   }
 );
 
-export const isCameraSelectedAtom = atom((get) => {
-  const cameras = get(camerasAtom);
-  return cameras.length > 0 && cameras.some((c) => c.selected);
-});
+export const isCameraSelectedAtom = atom(
+  (get) => get(camerasAtom).length > 0
+);
 
 export const toggleCameraSelectionAtom = atom(
   null,
   (get, set, cameraId: Camera["id"]) => {
-    set(camerasAtom, (cameras) =>
-      cameras.map((c) => ({
-        ...c,
-        selected: c.id === cameraId ? !c.selected : false,
-      }))
-    );
+    if (!cameraExists(get(camerasDataStateAtom), cameraId)) {
+      return;
+    }
+    if (get(selectedCameraIdStateAtom) === cameraId) {
+      return;
+    }
+    set(selectedCameraIdStateAtom, cameraId);
+    set(sceneDirtyAtom, true);
   }
 );
 
 export const selectCameraAtom = atom(
   null,
   (get, set, cameraId: Camera["id"]) => {
-    set(camerasAtom, (cameras) =>
-      cameras.map((c) => ({
-        ...c,
-        selected: c.id === cameraId,
-      }))
-    );
+    if (!cameraExists(get(camerasDataStateAtom), cameraId)) {
+      return;
+    }
+    if (get(selectedCameraIdStateAtom) === cameraId) {
+      return;
+    }
+    set(selectedCameraIdStateAtom, cameraId);
+    set(sceneDirtyAtom, true);
   }
 );
 
@@ -499,22 +496,28 @@ export const canRedoSceneAtom = atom((get) => {
   return history.index < history.entries.length - 1;
 });
 
+function applySnapshotState(set: any, snapshot: SceneSnapshot) {
+  set(lightsDataStateAtom, cloneSnapshot(snapshot.lights));
+  set(camerasDataStateAtom, cloneSnapshot(snapshot.cameras));
+  set(selectedCameraIdStateAtom, snapshot.activeCameraId);
+  set(selectedLightIdStateAtom, null);
+  set(soloLightIdStateAtom, null);
+  set(iblRotationStateAtom, snapshot.iblRotation);
+}
+
 export const applySceneSnapshotAtom = atom(
   null,
-  (get, set, snapshot: SceneSnapshot) => {
+  (_get, set, snapshot: SceneSnapshot) => {
     const nextSnapshot = createSceneSnapshot(
       snapshot.lights,
       snapshot.cameras,
+      snapshot.activeCameraId,
       snapshot.iblRotation
     );
     set(isApplyingSceneSnapshotAtom, true);
-    set(lightsStateAtom, cloneSnapshot(normalizeLights(nextSnapshot.lights)));
-    set(camerasStateAtom, cloneSnapshot(nextSnapshot.cameras));
-    set(iblRotationStateAtom, nextSnapshot.iblRotation);
+    applySnapshotState(set, nextSnapshot);
     set(isApplyingSceneSnapshotAtom, false);
     set(sceneDirtyAtom, false);
-    // JSON restore is authoritative: replace local undo/redo stack to avoid
-    // stale IndexedDB history influencing the restored scene.
     set(sceneHistoryAtom, {
       entries: [nextSnapshot],
       index: 0,
@@ -533,9 +536,7 @@ export const undoSceneAtom = atom(null, (get, set) => {
   const snapshot = history.entries[nextIndex];
 
   set(isApplyingSceneSnapshotAtom, true);
-  set(lightsStateAtom, cloneSnapshot(normalizeLights(snapshot.lights)));
-  set(camerasStateAtom, cloneSnapshot(snapshot.cameras));
-  set(iblRotationStateAtom, snapshot.iblRotation);
+  applySnapshotState(set, snapshot);
   set(isApplyingSceneSnapshotAtom, false);
   set(sceneDirtyAtom, false);
   set(sceneHistoryAtom, {
@@ -554,9 +555,7 @@ export const redoSceneAtom = atom(null, (get, set) => {
   const snapshot = history.entries[nextIndex];
 
   set(isApplyingSceneSnapshotAtom, true);
-  set(lightsStateAtom, cloneSnapshot(normalizeLights(snapshot.lights)));
-  set(camerasStateAtom, cloneSnapshot(snapshot.cameras));
-  set(iblRotationStateAtom, snapshot.iblRotation);
+  applySnapshotState(set, snapshot);
   set(isApplyingSceneSnapshotAtom, false);
   set(sceneDirtyAtom, false);
   set(sceneHistoryAtom, {
@@ -570,17 +569,13 @@ export const hydrateSceneHistoryAtom = atom(
   (
     get,
     set,
-    payload: { entries: SceneSnapshot[]; index: number } | null | undefined
+    payload: { entries: unknown[]; index: number } | null | undefined
   ) => {
     if (get(sceneHistoryAtom).hydrated) {
       return;
     }
 
-    const fallback = createSceneSnapshot(
-      get(lightsStateAtom),
-      get(camerasStateAtom),
-      get(iblRotationStateAtom)
-    );
+    const fallback = get(currentSceneSnapshotAtom);
     const normalized = normalizeSceneHistory(
       payload?.entries,
       payload?.index,
@@ -589,9 +584,7 @@ export const hydrateSceneHistoryAtom = atom(
     const current = normalized.entries[normalized.index];
 
     set(isApplyingSceneSnapshotAtom, true);
-    set(lightsStateAtom, cloneSnapshot(normalizeLights(current.lights)));
-    set(camerasStateAtom, cloneSnapshot(current.cameras));
-    set(iblRotationStateAtom, current.iblRotation);
+    applySnapshotState(set, current);
     set(isApplyingSceneSnapshotAtom, false);
     set(sceneDirtyAtom, false);
     set(sceneHistoryAtom, {
@@ -605,16 +598,10 @@ export const hydrateSceneHistoryAtom = atom(
 export const isSceneDirtyAtom = atom((get) => get(sceneDirtyAtom));
 
 export const commitSceneHistoryAtom = atom(null, (get, set) => {
-  const isDirty = get(sceneDirtyAtom);
-  if (!isDirty) {
+  if (!get(sceneDirtyAtom)) {
     return;
   }
 
-  const snapshot = createSceneSnapshot(
-    get(lightsStateAtom),
-    get(camerasStateAtom),
-    get(iblRotationStateAtom)
-  );
   set(sceneDirtyAtom, false);
-  set(pushSceneHistoryAtom, snapshot);
+  set(pushSceneHistoryAtom, get(currentSceneSnapshotAtom));
 });

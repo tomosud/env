@@ -1,17 +1,11 @@
 import * as THREE from "three";
 import * as fflate from "three/examples/jsm/libs/fflate.module.js";
 import convertCubemapToEquirectangular from "../components/HDRIPreview/convertCubemapToEquirectangular";
-import type { Light, Camera } from "../store";
+import type { ProjectSettingsSnapshot } from "./sceneSnapshot";
 
 export type ExportResolution = "1k" | "2k" | "4k";
 
-export type SettingsSnapshot = {
-  version: 1;
-  lights: Light[];
-  cameras: Camera[];
-  iblRotation?: number;
-  imageBasename?: string;
-};
+export type SettingsSnapshot = ProjectSettingsSnapshot;
 
 export function getUniqueBasename(prefix = "envmap"): string {
   const now = new Date();

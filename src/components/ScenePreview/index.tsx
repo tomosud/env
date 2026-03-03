@@ -56,7 +56,6 @@ export function ScenePreview() {
           ...l,
           target: l.selected ? { x, y, z } : l.target,
           latlon: l.selected ? { x: lon, y: lat } : l.latlon,
-          ts: Date.now(),
         }))
       );
     },

@@ -7,19 +7,18 @@ import { AppToolbar } from "./components/AppToolbar";
 import { CommandPalette } from "./components/CommandPalette";
 import {
   applySceneSnapshotAtom,
-  camerasAtom,
   commitSceneHistoryAtom,
+  currentSceneSnapshotAtom,
   hydrateSceneHistoryAtom,
   imageBasenameAtom,
-  iblRotationAtom,
   isSceneDirtyAtom,
-  lightsAtom,
   projectDirectoryHandleAtom,
   sceneHistoryAtom,
   type SceneSnapshot,
 } from "./store";
 import type { SettingsSnapshot } from "./utils/exportEnvMap";
 import { idbGet, idbSet } from "./utils/indexedDb";
+import { parseProjectSettingsSnapshot } from "./utils/sceneSnapshot";
 
 const SCENE_HISTORY_KEY = "scene-history-v1";
 const PROJECT_DIRECTORY_HANDLE_KEY = "project-directory-handle-v1";
@@ -28,9 +27,7 @@ function SceneHistoryPersistence() {
   const hydrateSceneHistory = useSetAtom(hydrateSceneHistoryAtom);
   const commitSceneHistory = useSetAtom(commitSceneHistoryAtom);
   const history = useAtomValue(sceneHistoryAtom);
-  const lights = useAtomValue(lightsAtom);
-  const cameras = useAtomValue(camerasAtom);
-  const iblRotation = useAtomValue(iblRotationAtom);
+  const currentSceneSnapshot = useAtomValue(currentSceneSnapshotAtom);
   const isSceneDirty = useAtomValue(isSceneDirtyAtom);
 
   useEffect(() => {
@@ -82,7 +79,7 @@ function SceneHistoryPersistence() {
     return () => {
       clearTimeout(timer);
     };
-  }, [history.hydrated, isSceneDirty, lights, cameras, iblRotation, commitSceneHistory]);
+  }, [history.hydrated, isSceneDirty, currentSceneSnapshot, commitSceneHistory]);
 
   useEffect(() => {
     if (!history.hydrated) {
@@ -181,21 +178,13 @@ function SettingsDropZone({ children }: { children: React.ReactNode }) {
       const reader = new FileReader();
       reader.onload = (ev) => {
         try {
-          const data = JSON.parse(ev.target?.result as string) as SettingsSnapshot;
-          if (
-            data.version === 1 &&
-            Array.isArray(data.lights) &&
-            Array.isArray(data.cameras)
-          ) {
-            applySceneSnapshot({
-              version: 1,
-              lights: data.lights,
-              cameras: data.cameras,
-              iblRotation:
-                typeof data.iblRotation === "number" ? data.iblRotation : 0,
-            });
-            if (typeof data.imageBasename === "string") {
-              setImageBasename(data.imageBasename);
+          const parsed = parseProjectSettingsSnapshot(
+            JSON.parse(ev.target?.result as string) as SettingsSnapshot
+          );
+          if (parsed) {
+            applySceneSnapshot(parsed.snapshot);
+            if (typeof parsed.imageBasename === "string") {
+              setImageBasename(parsed.imageBasename);
             }
             toast.success("Settings restored.");
           } else {

@@ -4,11 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
 import {
-  camerasAtom,
+  currentSceneSnapshotAtom,
   envMapTextureAtom,
   imageBasenameAtom,
   iblRotationAtom,
-  lightsAtom,
   projectDirectoryHandleAtom,
   sceneHistoryAtom,
   sceneRendererAtom,
@@ -23,6 +22,7 @@ import {
   getResolutionSize,
   sanitizeBasename,
 } from "../../utils/exportEnvMap";
+import { createProjectSettingsSnapshot } from "../../utils/sceneSnapshot";
 import {
   verifyDirectoryPermission,
   writeFilesToDirectory,
@@ -301,8 +301,7 @@ function buildMatcapFloatRGB(
 export function IBLMatcapPanel() {
   const texture = useAtomValue(envMapTextureAtom);
   const renderer = useAtomValue(sceneRendererAtom);
-  const lights = useAtomValue(lightsAtom);
-  const cameras = useAtomValue(camerasAtom);
+  const sceneSnapshot = useAtomValue(currentSceneSnapshotAtom);
   const imageBasename = useAtomValue(imageBasenameAtom);
   const projectDirectoryHandle = useAtomValue(projectDirectoryHandleAtom);
   const historyIndex = useAtomValue(sceneHistoryAtom).index;
@@ -374,9 +373,7 @@ export function IBLMatcapPanel() {
   }, [
     redrawPreview,
     historyIndex,
-    lights,
-    cameras,
-    iblRotation,
+    sceneSnapshot,
     texture,
     renderer,
   ]);
@@ -497,7 +494,7 @@ export function IBLMatcapPanel() {
           filename: `${normalizedImageBasename}_matcap.hdr`,
         });
         exportSettingsJSON(
-          { version: 1, lights, cameras, iblRotation },
+          createProjectSettingsSnapshot(sceneSnapshot, imageBasename),
           normalizedImageBasename
         );
         toast.success(`Saved matcap HDR + settings (${outputSize}x${outputSize})`);
@@ -559,7 +556,7 @@ export function IBLMatcapPanel() {
           filename: `${normalizedImageBasename}_matcap.exr`,
         });
         exportSettingsJSON(
-          { version: 1, lights, cameras, iblRotation },
+          createProjectSettingsSnapshot(sceneSnapshot, imageBasename),
           normalizedImageBasename
         );
         toast.success(`Saved matcap EXR + settings (${outputSize}x${outputSize})`);

@@ -15,5 +15,5 @@ export function useKeyPress(targetKey: string, handler: () => void) {
     return () => {
       window.removeEventListener("keypress", keyDownHandler);
     };
-  }, []);
+  }, [handler, targetKey]);
 }

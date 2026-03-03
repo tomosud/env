@@ -37,6 +37,15 @@ const deprioritizedSkyGradientRaycast: THREE.Mesh["raycast"] = function (
   }
 };
 
+function wrapSignedUnit(value: number) {
+  const wrapped = ((((value + 1) % 2) + 2) % 2) - 1;
+  return wrapped === 1 ? -1 : wrapped;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
 export function LightRenderer({
   index,
   lightAtom,
@@ -51,15 +60,21 @@ export function LightRenderer({
   const selectLight = useSetAtom(selectLightAtom);
   const lights = useAtomValue(lightsAtom);
   const selectedLightId = lights.find((l) => l.selected)?.id;
+  const isSolo = lights.some((candidate) => candidate.solo);
+  const isLightVisible = (candidate: Light) =>
+    isSolo ? candidate.solo : candidate.visible;
   const visibleLightIds = new Set(
-    lights.filter((candidate) => candidate.visible).map((candidate) => candidate.id)
+    lights
+      .filter((candidate) => isLightVisible(candidate))
+      .map((candidate) => candidate.id)
   );
+  const effectiveVisible = isLightVisible(light);
 
   const [hovered, setHovered] = useState(false);
   useCursor(hovered, "move", "default");
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
-    if (!enableEvents || !light.visible) {
+    if (!enableEvents || !effectiveVisible) {
       return;
     }
 
@@ -113,8 +128,10 @@ export function LightRenderer({
           const lon = x / (size.width / 2);
           return {
             ...l,
-            latlon: { x: l.latlon.x + lon, y: l.latlon.y + lat },
-            ts: Date.now(),
+            latlon: {
+              x: wrapSignedUnit(l.latlon.x + lon),
+              y: clamp(l.latlon.y + lat, -1, 1),
+            },
           };
         });
       },
@@ -138,13 +155,11 @@ export function LightRenderer({
           setLight((l) => ({
             ...l,
             intensity: Math.max(0, l.intensity + y * 0.001),
-            ts: Date.now(),
           }));
         } else if (metaKey) {
           setLight((l) => ({
             ...l,
             scale: Math.max(0, l.scale + y * 0.001),
-            ts: Date.now(),
           }));
         }
       },
@@ -177,12 +192,14 @@ export function LightRenderer({
     return (
       <Sphere
         userData={{ lightId: light.id }}
-        visible={light.visible}
+        visible={effectiveVisible}
         args={[100, 64, 64]}
         castShadow={false}
         receiveShadow={false}
         renderOrder={index}
-        raycast={light.visible ? deprioritizedSkyGradientRaycast : disableRaycast}
+        raycast={
+          effectiveVisible ? deprioritizedSkyGradientRaycast : disableRaycast
+        }
         onClick={handleClick}
       >
         <SkyGradientLightMaterial
@@ -197,11 +214,11 @@ export function LightRenderer({
       {...(bind() as any)}
       ref={meshRef}
       userData={{ lightId: light.id }}
-      visible={light.visible}
+      visible={effectiveVisible}
       castShadow={false}
       receiveShadow={false}
       renderOrder={index}
-      raycast={light.visible ? defaultRaycast : disableRaycast}
+      raycast={effectiveVisible ? defaultRaycast : disableRaycast}
       onClick={handleClick}
     >
       <planeGeometry args={[1, 1, 1, 1]} />

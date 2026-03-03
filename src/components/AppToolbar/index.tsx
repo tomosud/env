@@ -17,12 +17,10 @@ import {
   applySceneSnapshotAtom,
   canRedoSceneAtom,
   canUndoSceneAtom,
-  camerasAtom,
+  currentSceneSnapshotAtom,
   envMapTextureAtom,
   imageBasenameAtom,
-  iblRotationAtom,
   jsonSaveFilenameAtom,
-  lightsAtom,
   modeAtom,
   projectDirectoryHandleAtom,
   redoSceneAtom,
@@ -40,6 +38,10 @@ import {
   exportSettingsJSON,
   sanitizeBasename,
 } from "../../utils/exportEnvMap";
+import {
+  createProjectSettingsSnapshot,
+  parseProjectSettingsSnapshot,
+} from "../../utils/sceneSnapshot";
 import {
   backupExistingFileToDirectory,
   isFileSystemAccessSupported,
@@ -69,9 +71,7 @@ export function AppToolbar() {
   const activeModes = useAtomValue(activeModesAtom);
   const texture = useAtomValue(envMapTextureAtom);
   const renderer = useAtomValue(sceneRendererAtom);
-  const lights = useAtomValue(lightsAtom);
-  const cameras = useAtomValue(camerasAtom);
-  const iblRotation = useAtomValue(iblRotationAtom);
+  const sceneSnapshot = useAtomValue(currentSceneSnapshotAtom);
   const canUndo = useAtomValue(canUndoSceneAtom);
   const canRedo = useAtomValue(canRedoSceneAtom);
   const undoScene = useSetAtom(undoSceneAtom);
@@ -97,14 +97,8 @@ export function AppToolbar() {
     jsonSaveFilename || `${normalizedImageBasename}.json`;
   const isFolderMode = !!projectDirectoryHandle;
   const currentProjectSnapshot = useMemo<SettingsSnapshot>(
-    () => ({
-      version: 1,
-      lights,
-      cameras,
-      iblRotation,
-      imageBasename,
-    }),
-    [lights, cameras, iblRotation, imageBasename]
+    () => createProjectSettingsSnapshot(sceneSnapshot, imageBasename),
+    [sceneSnapshot, imageBasename]
   );
   const currentProjectSignature = useMemo(
     () => createProjectSnapshotSignature(currentProjectSnapshot),
@@ -189,33 +183,19 @@ export function AppToolbar() {
   }
 
   async function restoreSceneFromJSON(text: string, label: string) {
-    const data = JSON.parse(text) as SettingsSnapshot;
-
-    if (
-      data.version === 1 &&
-      Array.isArray(data.lights) &&
-      Array.isArray(data.cameras)
-    ) {
-      applySceneSnapshot({
-        version: 1,
-        lights: data.lights,
-        cameras: data.cameras,
-        iblRotation: typeof data.iblRotation === "number" ? data.iblRotation : 0,
-      });
-      if (typeof data.imageBasename === "string") {
-        setImageBasename(data.imageBasename);
+    const parsed = parseProjectSettingsSnapshot(JSON.parse(text));
+    if (parsed) {
+      applySceneSnapshot(parsed.snapshot);
+      if (typeof parsed.imageBasename === "string") {
+        setImageBasename(parsed.imageBasename);
       }
       setLastSavedJSONSignature(
-        createProjectSnapshotSignature({
-          version: 1,
-          lights: data.lights,
-          cameras: data.cameras,
-          iblRotation: typeof data.iblRotation === "number" ? data.iblRotation : 0,
-          imageBasename:
-            typeof data.imageBasename === "string"
-              ? data.imageBasename
-              : imageBasename,
-        })
+        createProjectSnapshotSignature(
+          createProjectSettingsSnapshot(
+            parsed.snapshot,
+            parsed.imageBasename ?? imageBasename
+          )
+        )
       );
       toast.success(`Opened ${label}`);
       return;

@@ -1,9 +1,53 @@
 import { CursorArrowRippleIcon } from "@heroicons/react/24/outline";
-import { Light, isLightPaintingAtom } from "../../store";
 import { PrimitiveAtom, useAtom } from "jotai";
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { ButtonApi, Pane } from "tweakpane";
+import { Pane } from "tweakpane";
+import { Light, isLightPaintingAtom } from "../../store";
+
+type PaneLightModel = {
+  name: string;
+  scale: number;
+  scaleX: number;
+  scaleY: number;
+  rotation: number;
+  latlon: { x: number; y: number };
+  target: { x: number; y: number; z: number };
+  color?: string;
+  intensity: number;
+  opacity: number;
+  additive: boolean;
+  type: Light["type"];
+  lightSides?: number;
+  lightPosition?: { x: number; y: number };
+  lightDistance?: number;
+  color2?: string;
+};
+
+function createPaneModel(light: Light): PaneLightModel {
+  return {
+    name: light.name,
+    scale: light.scale,
+    scaleX: light.scaleX,
+    scaleY: light.scaleY,
+    rotation: light.rotation,
+    latlon: structuredClone(light.latlon),
+    target: structuredClone(light.target),
+    color: "color" in light ? light.color : undefined,
+    intensity: light.intensity,
+    opacity: light.opacity,
+    additive: light.additive,
+    type: light.type,
+    lightSides: light.type === "procedural_umbrella" ? light.lightSides : undefined,
+    lightPosition:
+      light.type === "procedural_scrim"
+        ? structuredClone(light.lightPosition)
+        : undefined,
+    lightDistance:
+      light.type === "procedural_scrim" ? light.lightDistance : undefined,
+    color2: light.type === "sky_gradient" ? light.color2 : undefined,
+  };
+}
 
 export function LightProperties({
   lightAtom,
@@ -12,75 +56,80 @@ export function LightProperties({
 }) {
   const [isLightPainting, setLightPainting] = useAtom(isLightPaintingAtom);
   const [light, setLight] = useAtom(lightAtom);
-  const ref = useRef<HTMLDivElement>(null!);
-  const pane = useRef<Pane>(null!);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const paneRef = useRef<Pane | null>(null);
+  const paneModelRef = useRef<PaneLightModel>(createPaneModel(light));
 
-  const handleChange = useCallback(
-    (e: any) => {
-      setLight((old) => ({
-        ...old,
-        [e.target.key]: structuredClone(e.value),
-        ts: Date.now(),
-      }));
+  const updateLightValue = useCallback(
+    (key: string, value: unknown) => {
+      setLight((current) => {
+        const nextValue = structuredClone(value);
+        return {
+          ...current,
+          [key]: nextValue,
+        } as Light;
+      });
     },
-    [light.id]
+    [setLight]
   );
 
   useEffect(() => {
-    pane.current?.refresh();
-  }, [light.ts]);
-
-  useEffect(() => {
-    if (!ref.current) {
+    if (!containerRef.current) {
       return;
     }
 
-    pane.current = new Pane({ container: ref.current, expanded: true });
+    paneModelRef.current = createPaneModel(light);
+    const pane = new Pane({ container: containerRef.current, expanded: true });
+    paneRef.current = pane;
 
-    pane.current.addBinding(light, "name").on("change", handleChange);
+    const handleBindingChange = (event: { target: { key: string }; value: unknown }) => {
+      updateLightValue(event.target.key, event.value);
+    };
 
-    pane.current.addBlade({ view: "separator" });
+    pane.addBinding(paneModelRef.current, "name").on("change", handleBindingChange);
 
-    pane.current
-      .addBinding(light, "scale", { min: 0, max: 10, step: 0.1 })
-      .on("change", handleChange);
-    pane.current
-      .addBinding(light, "scaleX", {
+    pane.addBlade({ view: "separator" });
+
+    pane
+      .addBinding(paneModelRef.current, "scale", { min: 0, max: 10, step: 0.1 })
+      .on("change", handleBindingChange);
+    pane
+      .addBinding(paneModelRef.current, "scaleX", {
         label: "width",
         min: 0,
         max: 10,
         step: 0.1,
       })
-      .on("change", handleChange);
-    pane.current
-      .addBinding(light, "scaleY", {
+      .on("change", handleBindingChange);
+    pane
+      .addBinding(paneModelRef.current, "scaleY", {
         label: "height",
         min: 0,
         max: 10,
         step: 0.1,
       })
-      .on("change", handleChange);
-    pane.current
-      .addBinding(light, "rotation", {
+      .on("change", handleBindingChange);
+    pane
+      .addBinding(paneModelRef.current, "rotation", {
         min: -Math.PI,
         max: Math.PI,
         step: 0.01,
       })
-      .on("change", handleChange);
-    pane.current
-      .addBinding(light, "latlon", {
+      .on("change", handleBindingChange);
+    pane
+      .addBinding(paneModelRef.current, "latlon", {
         x: { min: -1, max: 1, step: 0.01 },
         y: { inverted: true, min: -1, max: 1, step: 0.01 },
       })
-      .on("change", handleChange);
-    pane.current
-      .addBinding(light, "target", {
+      .on("change", handleBindingChange);
+    pane
+      .addBinding(paneModelRef.current, "target", {
         x: { min: -10, max: 10, step: 0.1 },
         y: { min: -10, max: 10, step: 0.1 },
         z: { min: -10, max: 10, step: 0.1 },
       })
-      .on("change", handleChange);
-    pane.current
+      .on("change", handleBindingChange);
+    pane
       .addButton({ title: "Paint Light", label: "", disabled: isLightPainting })
       .on("click", () => {
         setLightPainting(true);
@@ -95,52 +144,75 @@ export function LightProperties({
         });
       });
 
-    pane.current.addBlade({ view: "separator" });
+    pane.addBlade({ view: "separator" });
 
-    pane.current.addBinding(light, "color").on("change", handleChange);
-    pane.current
-      .addBinding(light, "intensity", { min: 0, max: 100, step: 0.1 })
-      .on("change", handleChange);
-    pane.current
-      .addBinding(light, "opacity", { min: 0, max: 1 })
-      .on("change", handleChange);
-    pane.current.addBinding(light, "additive").on("change", handleChange);
+    if ("color" in paneModelRef.current) {
+      pane
+        .addBinding(paneModelRef.current, "color")
+        .on("change", handleBindingChange);
+    }
+    pane
+      .addBinding(paneModelRef.current, "intensity", {
+        min: 0,
+        max: 100,
+        step: 0.1,
+      })
+      .on("change", handleBindingChange);
+    pane
+      .addBinding(paneModelRef.current, "opacity", { min: 0, max: 1 })
+      .on("change", handleBindingChange);
+    pane
+      .addBinding(paneModelRef.current, "additive")
+      .on("change", handleBindingChange);
 
-    pane.current.addBlade({ view: "separator" });
+    pane.addBlade({ view: "separator" });
 
-    pane.current.addBinding(light, "type", { readonly: true });
+    pane.addBinding(paneModelRef.current, "type", { readonly: true });
 
     if (light.type === "procedural_umbrella") {
-      pane.current
-        .addBinding(light, "lightSides", { min: 3, max: 20 })
-        .on("change", handleChange);
+      pane
+        .addBinding(paneModelRef.current, "lightSides", { min: 3, max: 20 })
+        .on("change", handleBindingChange);
     }
 
     if (light.type === "procedural_scrim") {
-      pane.current
-        .addBinding(light, "lightPosition", {
+      pane
+        .addBinding(paneModelRef.current, "lightPosition", {
           label: "scrim xy",
           x: { min: -1, max: 1 },
           y: { inverted: true, min: -1, max: 1 },
         })
-        .on("change", handleChange);
-      pane.current
-        .addBinding(light, "lightDistance", {
+        .on("change", handleBindingChange);
+      pane
+        .addBinding(paneModelRef.current, "lightDistance", {
           min: 0.01,
           max: 1,
           label: "spread",
         })
-        .on("change", handleChange);
+        .on("change", handleBindingChange);
     }
 
     if (light.type === "sky_gradient") {
-      pane.current.addBinding(light, "color2").on("change", handleChange);
+      pane
+        .addBinding(paneModelRef.current, "color2")
+        .on("change", handleBindingChange);
     }
 
     return () => {
-      pane.current.dispose();
+      paneRef.current = null;
+      pane.dispose();
     };
-  }, [light.id, isLightPainting]);
+  }, [isLightPainting, light.id, light.type, setLightPainting, updateLightValue]);
 
-  return <div ref={ref} />;
+  useEffect(() => {
+    const pane = paneRef.current;
+    if (!pane) {
+      return;
+    }
+
+    Object.assign(paneModelRef.current, createPaneModel(light));
+    pane.refresh();
+  }, [light]);
+
+  return <div ref={containerRef} />;
 }
