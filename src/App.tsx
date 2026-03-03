@@ -10,6 +10,7 @@ import {
   camerasAtom,
   commitSceneHistoryAtom,
   hydrateSceneHistoryAtom,
+  imageBasenameAtom,
   iblRotationAtom,
   isSceneDirtyAtom,
   lightsAtom,
@@ -153,6 +154,7 @@ function ProjectDirectoryPersistence() {
 
 function SettingsDropZone({ children }: { children: React.ReactNode }) {
   const applySceneSnapshot = useSetAtom(applySceneSnapshotAtom);
+  const setImageBasename = useSetAtom(imageBasenameAtom);
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -192,6 +194,9 @@ function SettingsDropZone({ children }: { children: React.ReactNode }) {
               iblRotation:
                 typeof data.iblRotation === "number" ? data.iblRotation : 0,
             });
+            if (typeof data.imageBasename === "string") {
+              setImageBasename(data.imageBasename);
+            }
             toast.success("Settings restored.");
           } else {
             toast.error("Invalid settings file.");
@@ -202,7 +207,7 @@ function SettingsDropZone({ children }: { children: React.ReactNode }) {
       };
       reader.readAsText(file);
     },
-    [applySceneSnapshot]
+    [applySceneSnapshot, setImageBasename]
   );
 
   return (

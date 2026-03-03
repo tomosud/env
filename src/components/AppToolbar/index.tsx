@@ -102,8 +102,9 @@ export function AppToolbar() {
       lights,
       cameras,
       iblRotation,
+      imageBasename,
     }),
-    [lights, cameras, iblRotation]
+    [lights, cameras, iblRotation, imageBasename]
   );
   const currentProjectSignature = useMemo(
     () => createProjectSnapshotSignature(currentProjectSnapshot),
@@ -201,12 +202,19 @@ export function AppToolbar() {
         cameras: data.cameras,
         iblRotation: typeof data.iblRotation === "number" ? data.iblRotation : 0,
       });
+      if (typeof data.imageBasename === "string") {
+        setImageBasename(data.imageBasename);
+      }
       setLastSavedJSONSignature(
         createProjectSnapshotSignature({
           version: 1,
           lights: data.lights,
           cameras: data.cameras,
           iblRotation: typeof data.iblRotation === "number" ? data.iblRotation : 0,
+          imageBasename:
+            typeof data.imageBasename === "string"
+              ? data.imageBasename
+              : imageBasename,
         })
       );
       toast.success(`Opened ${label}`);

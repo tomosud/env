@@ -35,6 +35,7 @@ Thanks to the [pmndrs/env](https://github.com/pmndrs/env) maintainers and contri
 - Dedicated `Save JSON` / `Open JSON` workflow in folder mode
 - JSON backup creation on overwrite (`backup/*.json`)
 - Drag-and-drop `.json` restore for scene recovery
+- `Image Name` persistence inside scene JSON
 
 ## Run locally (Windows)
 
@@ -73,6 +74,7 @@ The script auto-detects `yarn`/`corepack`, installs dependencies when needed, an
 - `Image Name` controls the image export filename.
 - Main exports become `<Image Name>.hdr` or `<Image Name>.png`.
 - Matcap exports become `<Image Name>_matcap.png`, `<Image Name>_matcap.hdr`, and `<Image Name>_matcap.exr`.
+- Saved scene JSON also stores `Image Name`, and restoring that JSON restores the toolbar value.
 - The JSON filename is independent from `Image Name`.
 - Changing the JSON save name does not change the image save name.
 
