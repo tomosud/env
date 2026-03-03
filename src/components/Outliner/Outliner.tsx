@@ -10,20 +10,18 @@ import {
   DragEndEvent,
 } from "@dnd-kit/core";
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import {
   Camera,
-  Light,
+  addCameraAtom,
   cameraAtomsAtom,
-  camerasAtom,
   isCommandPaletteOpenAtom,
   lightAtomsAtom,
   lightIdsAtom,
-  lightsAtom,
+  reorderLightsAtom,
   selectedCameraAtom,
 } from "../../store";
 import { LightListItem } from "./LightListItem";
@@ -32,14 +30,12 @@ import { useAtomValue, useSetAtom } from "jotai";
 
 export function Outliner() {
   const lightIds = useAtomValue(lightIdsAtom);
-  const setLights = useSetAtom(lightsAtom);
+  const reorderLights = useSetAtom(reorderLightsAtom);
   const setIsCommandPaletteOpen = useSetAtom(isCommandPaletteOpenAtom);
   const lightAtoms = useAtomValue(lightAtomsAtom);
   const cameraAtoms = useAtomValue(cameraAtomsAtom);
-  const setCameras = useSetAtom(camerasAtom);
+  const addCamera = useSetAtom(addCameraAtom);
   const currentCamera = useAtomValue(selectedCameraAtom);
-  const addCamera = (camera: Camera) =>
-    setCameras((cameras) => [...cameras, camera]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -52,11 +48,9 @@ export function Outliner() {
     const { active, over } = event;
 
     if (active && over && active.id !== over.id) {
-      setLights((lights) => {
-        const oldIndex = lights.findIndex((light) => light.id === active.id);
-        const newIndex = lights.findIndex((light) => light.id === over.id);
-
-        return arrayMove(lights, oldIndex, newIndex);
+      reorderLights({
+        activeId: String(active.id),
+        overId: String(over.id),
       });
     }
   }
@@ -72,7 +66,6 @@ export function Outliner() {
           onClick={() => {
             addCamera({
               ...currentCamera,
-              selected: false,
               name: `Camera ${String.fromCharCode(cameraAtoms.length + 65)}`,
               id: THREE.MathUtils.generateUUID(),
             });

@@ -16,6 +16,7 @@ import {
   ExportResolution,
   createRGBFloatEXRBlob,
   createRGBFloatHDRBlob,
+  downloadBlob,
   exportRGBFloatEXR,
   exportRGBFloatHDR,
   exportSettingsJSON,
@@ -24,7 +25,7 @@ import {
 } from "../../utils/exportEnvMap";
 import { createProjectSettingsSnapshot } from "../../utils/sceneSnapshot";
 import {
-  verifyDirectoryPermission,
+  getWritableDirectoryHandle,
   writeFilesToDirectory,
 } from "../../utils/fileSystemAccess";
 import {
@@ -37,15 +38,6 @@ import {
 } from "../../utils/matcap";
 
 const PREVIEW_SIZE = 256;
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.download = filename;
-  link.href = url;
-  link.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 3000);
-}
 
 function drawHemisphereFromEquirect(
   pixels: Uint8Array,
@@ -106,17 +98,13 @@ export function IBLMatcapPanel() {
   const canSaveEXR = !!texture && !!renderer && !isSavingEXR;
 
   async function ensureProjectDirectoryPermission() {
-    if (!projectDirectoryHandle) {
-      return null;
-    }
-
-    const granted = await verifyDirectoryPermission(projectDirectoryHandle, true);
-    if (!granted) {
+    const handle = await getWritableDirectoryHandle(projectDirectoryHandle);
+    if (!handle) {
       toast.error("Folder permission is required to save files.");
       return null;
     }
 
-    return projectDirectoryHandle;
+    return handle;
   }
 
   const redrawPreview = useCallback(async () => {

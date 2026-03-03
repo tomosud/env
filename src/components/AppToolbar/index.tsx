@@ -44,6 +44,7 @@ import {
 } from "../../utils/sceneSnapshot";
 import {
   backupExistingFileToDirectory,
+  getWritableDirectoryHandle,
   isFileSystemAccessSupported,
   pickJSONOpenFile,
   pickJSONSaveFile,
@@ -136,17 +137,13 @@ export function AppToolbar() {
   const canExport = !!texture && !!renderer && !isBusy;
 
   async function ensureProjectDirectoryPermission() {
-    if (!projectDirectoryHandle) {
-      return null;
-    }
-
-    const granted = await verifyDirectoryPermission(projectDirectoryHandle, true);
-    if (!granted) {
+    const handle = await getWritableDirectoryHandle(projectDirectoryHandle);
+    if (!handle) {
       toast.error("Folder permission is required to save files.");
       return null;
     }
 
-    return projectDirectoryHandle;
+    return handle;
   }
 
   async function handleConnectFolder() {

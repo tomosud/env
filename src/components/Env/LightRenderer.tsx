@@ -1,6 +1,6 @@
 import { Sphere, useCursor } from "@react-three/drei";
 import { ThreeEvent, useFrame, useThree } from "@react-three/fiber";
-import { PrimitiveAtom, useAtom, useAtomValue, useSetAtom } from "jotai";
+import { PrimitiveAtom, useAtomValue, useSetAtom } from "jotai";
 import { useRef, useState } from "react";
 import * as THREE from "three";
 import {
@@ -11,6 +11,7 @@ import {
   TextureLight,
   lightsAtom,
   selectLightAtom,
+  updateLightByIdAtom,
 } from "../../store";
 import { ProceduralScrimLightMaterial } from "./ProceduralScrimLightMaterial";
 import { ProceduralUmbrellaLightMaterial } from "./ProceduralUmbrellaLightMaterial";
@@ -51,8 +52,9 @@ export function LightRenderer({
   enableEvents?: boolean;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const [light, setLight] = useAtom(lightAtom);
+  const light = useAtomValue(lightAtom);
   const selectLight = useSetAtom(selectLightAtom);
+  const updateLightById = useSetAtom(updateLightByIdAtom);
   const lights = useAtomValue(lightsAtom);
   const selectedLightId = lights.find((l) => l.selected)?.id;
   const isSolo = lights.some((candidate) => candidate.solo);
@@ -118,17 +120,18 @@ export function LightRenderer({
       },
       onDrag: ({ delta: [x, y], event }) => {
         event.stopPropagation();
-        setLight((l) => {
-          return {
-            ...l,
+        updateLightById({
+          lightId: light.id,
+          updater: (current) => ({
+            ...current,
             latlon: updateLightLatLonByScreenDelta(
-              l.latlon,
+              current.latlon,
               x,
               y,
               size.width,
               size.height
             ),
-          };
+          }),
         });
       },
       onDragEnd: ({ event }) => {
@@ -148,15 +151,21 @@ export function LightRenderer({
         }
 
         if (altKey) {
-          setLight((l) => ({
-            ...l,
-            intensity: Math.max(0, l.intensity + y * 0.001),
-          }));
+          updateLightById({
+            lightId: light.id,
+            updater: (current) => ({
+              ...current,
+              intensity: Math.max(0, current.intensity + y * 0.001),
+            }),
+          });
         } else if (metaKey) {
-          setLight((l) => ({
-            ...l,
-            scale: Math.max(0, l.scale + y * 0.001),
-          }));
+          updateLightById({
+            lightId: light.id,
+            updater: (current) => ({
+              ...current,
+              scale: Math.max(0, current.scale + y * 0.001),
+            }),
+          });
         }
       },
     },

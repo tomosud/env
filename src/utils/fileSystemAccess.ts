@@ -34,6 +34,17 @@ export async function verifyDirectoryPermission(
   return (await handle.requestPermission(options)) === "granted";
 }
 
+export async function getWritableDirectoryHandle(
+  handle: FileSystemDirectoryHandle | null
+) {
+  if (!handle) {
+    return null;
+  }
+
+  const granted = await verifyDirectoryPermission(handle, true);
+  return granted ? handle : null;
+}
+
 export async function writeBlobToDirectory(
   directoryHandle: FileSystemDirectoryHandle,
   filename: string,

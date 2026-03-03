@@ -5,7 +5,11 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { PointerEvent, Suspense, useCallback } from "react";
 import { toast } from "sonner";
 import * as THREE from "three";
-import { isLightPaintingAtom, lightsAtom, pointerAtom } from "../../store";
+import {
+  isLightPaintingAtom,
+  pointerAtom,
+  updateSelectedLightsPlacementAtom,
+} from "../../store";
 import {
   ENV_CAPTURE_FAR,
   ENV_CAPTURE_NEAR,
@@ -23,7 +27,9 @@ const plusZ = new THREE.Vector3(0, 0, 1);
 const spherical = new THREE.Spherical();
 
 export function ScenePreview() {
-  const setLights = useSetAtom(lightsAtom);
+  const updateSelectedLightsPlacement = useSetAtom(
+    updateSelectedLightsPlacementAtom
+  );
   const isLightPainting = useAtomValue(isLightPaintingAtom);
 
   const handleModelClick = useCallback(
@@ -50,15 +56,12 @@ export function ScenePreview() {
       const latlon = sphericalToLatLon(spherical);
 
       const { x, y, z } = point;
-      setLights((lights) =>
-        lights.map((l) => ({
-          ...l,
-          target: l.selected ? { x, y, z } : l.target,
-          latlon: l.selected ? latlon : l.latlon,
-        }))
-      );
+      updateSelectedLightsPlacement({
+        target: { x, y, z },
+        latlon,
+      });
     },
-    [setLights, isLightPainting]
+    [updateSelectedLightsPlacement, isLightPainting]
   );
 
   const setPointer = useSetAtom(pointerAtom);

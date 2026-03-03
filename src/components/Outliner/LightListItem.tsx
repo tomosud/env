@@ -18,9 +18,10 @@ import {
   toggleLightSelectionAtom,
   deleteLightAtom,
   duplicateLightAtom,
+  toggleLightVisibilityAtom,
 } from "../../store";
 import { PropertiesPanelTunnel } from "../Properties";
-import { PrimitiveAtom, useAtom, useAtomValue, useSetAtom } from "jotai";
+import { PrimitiveAtom, useAtomValue, useSetAtom } from "jotai";
 import { LightProperties } from "./LightProperties";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -31,20 +32,15 @@ export function LightListItem({
 }: {
   lightAtom: PrimitiveAtom<Light>;
 }) {
-  const [light, setLight] = useAtom(lightAtom);
+  const light = useAtomValue(lightAtom);
   const isSolo = useAtomValue(isSoloAtom);
   const toggleSolo = useSetAtom(toggleSoloAtom);
   const toggleSelection = useSetAtom(toggleLightSelectionAtom);
   const duplicateLight = useSetAtom(duplicateLightAtom);
   const deleteLight = useSetAtom(deleteLightAtom);
+  const toggleVisibility = useSetAtom(toggleLightVisibilityAtom);
 
   const { id, name, visible, solo, selected } = light;
-
-  const toggleVisibility = () =>
-    setLight((old) => ({ ...old, visible: !old.visible }));
-
-  const updateLight = (light: Partial<Light>) =>
-    setLight((old) => ({ ...old, ...light } as any));
 
   const {
     attributes,
@@ -123,7 +119,7 @@ export function LightListItem({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                toggleVisibility();
+                toggleVisibility(light.id);
               }}
               className={clsx(
                 "text-white opacity-40 hover:opacity-100 group-hover:opacity-60 peer-checked:opacity-40 peer-checked:hover:opacity-100 transition-opacity",

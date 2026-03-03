@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { OrbitControls } from "@react-three/drei";
-import { selectedCameraAtom } from "../../store";
+import { updateSelectedCameraTransformAtom } from "../../store";
 import { useSetAtom } from "jotai";
 
 export type ControlsProps = {
@@ -9,7 +9,9 @@ export type ControlsProps = {
 
 export const Controls = ({ autoRotate }: ControlsProps) => {
   const controlsRef = useRef<React.ElementRef<typeof OrbitControls>>(null);
-  const setCamera = useSetAtom(selectedCameraAtom);
+  const updateSelectedCameraTransform = useSetAtom(
+    updateSelectedCameraTransformAtom
+  );
 
   return (
     <OrbitControls
@@ -20,7 +22,7 @@ export const Controls = ({ autoRotate }: ControlsProps) => {
       enableDamping={false}
       onEnd={(e) => {
         if (controlsRef.current) {
-          setCamera({
+          updateSelectedCameraTransform({
             position: controlsRef.current.object.position.toArray(),
             rotation: controlsRef.current.object.rotation.toArray() as [
               number,

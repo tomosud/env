@@ -6,6 +6,7 @@ import type {
   SceneLight,
   SceneSnapshot,
 } from "./utils/sceneSnapshot";
+import { normalizeLatLon } from "./utils/coordinates";
 import { createSceneSnapshot, parseSceneSnapshot } from "./utils/sceneSnapshot";
 import { withBasePath } from "./utils/withBasePath";
 
@@ -197,6 +198,23 @@ function cameraExists(cameras: SceneCamera[], cameraId: string | null) {
   return !!cameraId && cameras.some((camera) => camera.id === cameraId);
 }
 
+function updateLightList(
+  lights: SceneLight[],
+  lightId: string,
+  updater: (light: SceneLight) => SceneLight
+) {
+  let changed = false;
+  const nextLights = lights.map((light) => {
+    if (light.id !== lightId) {
+      return light;
+    }
+    changed = true;
+    return updater(light);
+  });
+
+  return changed ? nextLights : null;
+}
+
 const defaultSceneSnapshot = createSceneSnapshot(
   defaultLightsData,
   defaultCamerasData,
@@ -326,7 +344,7 @@ export const lightsAtom = atom(
 
 export const lightIdsAtom = atom((get) => get(lightsAtom).map((light) => light.id));
 
-export const lightAtomsAtom = splitAtom(lightsAtom);
+export const lightAtomsAtom = splitAtom(lightsAtom, (light) => light.id);
 
 export const isSoloAtom = atom((get) => get(soloLightIdStateAtom) !== null);
 
@@ -382,9 +400,78 @@ export const duplicateLightAtom = atom(
       ...structuredClone(light),
       id: THREE.MathUtils.generateUUID(),
       name: `${light.name} (copy)`,
+      latlon: normalizeLatLon({
+        x: light.latlon.x + 0.05,
+        y: light.latlon.y - 0.03,
+      }),
     };
 
     set(lightsDataStateAtom, [...lights, newLight]);
+    set(selectedLightIdStateAtom, newLight.id);
+    set(soloLightIdStateAtom, null);
+    set(sceneDirtyAtom, true);
+  }
+);
+
+export const addLightAtom = atom(null, (_get, set, light: SceneLight) => {
+  set(lightsDataStateAtom, (lights) => [...lights, structuredClone(light)]);
+  set(sceneDirtyAtom, true);
+});
+
+export const updateLightByIdAtom = atom(
+  null,
+  (
+    get,
+    set,
+    payload: {
+      lightId: Light["id"];
+      updater: (light: Light) => Light;
+    }
+  ) => {
+    const currentLights = get(lightsAtom);
+    const nextLights = currentLights.map((light) =>
+      light.id === payload.lightId ? payload.updater(light) : light
+    );
+    set(lightsAtom, nextLights);
+  }
+);
+
+export const toggleLightVisibilityAtom = atom(
+  null,
+  (get, set, lightId: Light["id"]) => {
+    const nextLights = updateLightList(get(lightsDataStateAtom), lightId, (light) => ({
+      ...light,
+      visible: !light.visible,
+    }));
+    if (!nextLights) {
+      return;
+    }
+    set(lightsDataStateAtom, nextLights);
+    set(sceneDirtyAtom, true);
+  }
+);
+
+export const reorderLightsAtom = atom(
+  null,
+  (
+    get,
+    set,
+    payload: {
+      activeId: Light["id"];
+      overId: Light["id"];
+    }
+  ) => {
+    const lights = get(lightsDataStateAtom);
+    const oldIndex = lights.findIndex((light) => light.id === payload.activeId);
+    const newIndex = lights.findIndex((light) => light.id === payload.overId);
+    if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) {
+      return;
+    }
+
+    const nextLights = [...lights];
+    const [moved] = nextLights.splice(oldIndex, 1);
+    nextLights.splice(newIndex, 0, moved);
+    set(lightsDataStateAtom, nextLights);
     set(sceneDirtyAtom, true);
   }
 );
@@ -432,6 +519,11 @@ export const camerasAtom = atom(
   }
 );
 
+export const addCameraAtom = atom(null, (_get, set, camera: SceneCamera) => {
+  set(camerasDataStateAtom, (cameras) => [...cameras, structuredClone(camera)]);
+  set(sceneDirtyAtom, true);
+});
+
 export const iblRotationAtom = atom(
   (get) => get(iblRotationStateAtom),
   (_get, set, value: number) => {
@@ -440,7 +532,7 @@ export const iblRotationAtom = atom(
   }
 );
 
-export const cameraAtomsAtom = splitAtom(camerasAtom);
+export const cameraAtomsAtom = splitAtom(camerasAtom, (camera) => camera.id);
 
 export const selectedCameraAtom = atom(
   (get) => {
@@ -487,6 +579,48 @@ export const selectCameraAtom = atom(
     }
     set(selectedCameraIdStateAtom, cameraId);
     set(sceneDirtyAtom, true);
+  }
+);
+
+export const updateSelectedCameraTransformAtom = atom(
+  null,
+  (
+    get,
+    set,
+    value: Pick<SceneCamera, "position" | "rotation">
+  ) => {
+    const selectedCameraId = get(selectedCameraIdStateAtom);
+    set(
+      camerasAtom,
+      get(camerasAtom).map((camera) =>
+        camera.id === selectedCameraId ? { ...camera, ...value } : camera
+      )
+    );
+  }
+);
+
+export const updateSelectedLightsPlacementAtom = atom(
+  null,
+  (
+    get,
+    set,
+    value: {
+      target: SceneLight["target"];
+      latlon: SceneLight["latlon"];
+    }
+  ) => {
+    set(
+      lightsAtom,
+      get(lightsAtom).map((light) =>
+        light.selected
+          ? {
+              ...light,
+              target: value.target,
+              latlon: value.latlon,
+            }
+          : light
+      )
+    );
   }
 );
 

@@ -1,9 +1,9 @@
 import { CursorArrowRippleIcon } from "@heroicons/react/24/outline";
-import { PrimitiveAtom, useAtom } from "jotai";
+import { PrimitiveAtom, useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Pane } from "tweakpane";
-import { Light, isLightPaintingAtom } from "../../store";
+import { Light, isLightPaintingAtom, updateLightByIdAtom } from "../../store";
 
 type PaneLightModel = {
   name: string;
@@ -55,22 +55,26 @@ export function LightProperties({
   lightAtom: PrimitiveAtom<Light>;
 }) {
   const [isLightPainting, setLightPainting] = useAtom(isLightPaintingAtom);
-  const [light, setLight] = useAtom(lightAtom);
+  const light = useAtomValue(lightAtom);
+  const updateLightById = useSetAtom(updateLightByIdAtom);
   const containerRef = useRef<HTMLDivElement>(null);
   const paneRef = useRef<Pane | null>(null);
   const paneModelRef = useRef<PaneLightModel>(createPaneModel(light));
 
   const updateLightValue = useCallback(
     (key: string, value: unknown) => {
-      setLight((current) => {
-        const nextValue = structuredClone(value);
-        return {
-          ...current,
-          [key]: nextValue,
-        } as Light;
+      updateLightById({
+        lightId: light.id,
+        updater: (current) => {
+          const nextValue = structuredClone(value);
+          return {
+            ...current,
+            [key]: nextValue,
+          } as Light;
+        },
       });
     },
-    [setLight]
+    [light.id, updateLightById]
   );
 
   useEffect(() => {

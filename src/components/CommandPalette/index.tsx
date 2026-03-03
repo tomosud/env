@@ -7,8 +7,13 @@ import {
   PhotoIcon,
 } from "@heroicons/react/24/outline";
 import clsx from "clsx";
-import { useAtom, useSetAtom } from "jotai";
-import { Light, isCommandPaletteOpenAtom, lightsAtom } from "../../store";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import {
+  Light,
+  addLightAtom,
+  isCommandPaletteOpenAtom,
+  lightsAtom,
+} from "../../store";
 import * as THREE from "three";
 import { withBasePath } from "../../utils/withBasePath";
 
@@ -166,8 +171,8 @@ function Item({
   colorTheme?: "orange" | "blue" | "green" | "red" | "purple";
 }) {
   const setOpen = useSetAtom(isCommandPaletteOpenAtom);
-  const [lights, setLights] = useAtom(lightsAtom);
-  const addLight = (light: Light) => setLights((lights) => [...lights, light]);
+  const lights = useAtomValue(lightsAtom);
+  const addLight = useSetAtom(addLightAtom);
 
   function handleSelect(value: string) {
     const commonProps = {
