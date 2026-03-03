@@ -33,11 +33,9 @@ import {
   createEnvMapHDRBlob,
   createEnvMapPNGBlob,
   createSettingsJSONBlob,
-  exportEnvMapHDR,
-  exportEnvMapPNG,
-  exportSettingsJSON,
   sanitizeBasename,
 } from "../../utils/exportEnvMap";
+import { saveOutputFiles } from "../../utils/saveOutputFiles";
 import {
   createProjectSettingsSnapshot,
   parseProjectSettingsSnapshot,
@@ -52,7 +50,6 @@ import {
   readTextFromFileHandle,
   verifyDirectoryPermission,
   writeBlobToFileHandle,
-  writeFilesToDirectory,
 } from "../../utils/fileSystemAccess";
 import { Logo } from "./Logo";
 
@@ -276,31 +273,32 @@ export function AppToolbar() {
 
     try {
       setIsExporting(true);
-      if (isFolderMode) {
-        const directoryHandle = await ensureProjectDirectoryPermission();
-        if (!directoryHandle) {
-          return;
-        }
-
-        await writeFilesToDirectory(directoryHandle, [
+      const saveResult = await saveOutputFiles({
+        projectDirectoryHandle,
+        files: [
           {
             filename: `${normalizedImageBasename}.hdr`,
             blob: createEnvMapHDRBlob({ texture, renderer, resolution }),
           },
-        ]);
+        ],
+        settingsCompanion: {
+          snapshot: currentProjectSnapshot,
+          basename: normalizedImageBasename,
+        },
+      });
+      if (!saveResult) {
+        return;
+      }
+
+      if (saveResult.mode === "directory") {
         toast.success(
-          `Saved ${normalizedImageBasename}.hdr to ${directoryHandle.name}`
+          `Saved ${normalizedImageBasename}.hdr to ${saveResult.directoryName}`
         );
       } else {
-        exportEnvMapHDR({
-          texture,
-          renderer,
-          resolution,
-          filename: `${normalizedImageBasename}.hdr`,
-        });
-        exportSettingsJSON(currentProjectSnapshot, normalizedImageBasename);
         toast.success(`Saved HDR + settings (${resolution})`);
-        triggerHint();
+        if (saveResult.savedSettingsJSON) {
+          triggerHint();
+        }
       }
     } catch (error) {
       console.error(error);
@@ -318,31 +316,32 @@ export function AppToolbar() {
 
     try {
       setIsExporting(true);
-      if (isFolderMode) {
-        const directoryHandle = await ensureProjectDirectoryPermission();
-        if (!directoryHandle) {
-          return;
-        }
-
-        await writeFilesToDirectory(directoryHandle, [
+      const saveResult = await saveOutputFiles({
+        projectDirectoryHandle,
+        files: [
           {
             filename: `${normalizedImageBasename}.png`,
-            blob: await createEnvMapPNGBlob({ texture, renderer, resolution }),
+            blob: createEnvMapPNGBlob({ texture, renderer, resolution }),
           },
-        ]);
+        ],
+        settingsCompanion: {
+          snapshot: currentProjectSnapshot,
+          basename: normalizedImageBasename,
+        },
+      });
+      if (!saveResult) {
+        return;
+      }
+
+      if (saveResult.mode === "directory") {
         toast.success(
-          `Saved ${normalizedImageBasename}.png to ${directoryHandle.name}`
+          `Saved ${normalizedImageBasename}.png to ${saveResult.directoryName}`
         );
       } else {
-        await exportEnvMapPNG({
-          texture,
-          renderer,
-          resolution,
-          filename: `${normalizedImageBasename}.png`,
-        });
-        exportSettingsJSON(currentProjectSnapshot, normalizedImageBasename);
         toast.success(`Saved PNG + settings (${resolution})`);
-        triggerHint();
+        if (saveResult.savedSettingsJSON) {
+          triggerHint();
+        }
       }
     } catch (error) {
       console.error(error);

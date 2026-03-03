@@ -14,6 +14,23 @@
 - Keep each phase shippable with focused verification.
 - Add tests or reproducible checks before broad cleanup where behavior is currently ambiguous.
 
+## Current Status
+
+- Completed:
+  - Phase 1: persistent scene data and transient UI state were split in the store.
+  - Phase 2: snapshot parse/normalize/restore now goes through a shared codec.
+  - Phase 3: `LightProperties` no longer relies on stale long-lived object bindings.
+  - Phase 4: light coordinate normalization and transform math were centralized.
+  - Phase 6: undo/redo and JSON restore now operate on normalized scene snapshots.
+  - Phase 7: solo visibility, camera selection edge cases, stale key handlers, and duplicate-light instability were addressed.
+  - Export/save flow deduplication between `AppToolbar` and `IBLMatcapPanel`.
+- Partially completed:
+  - Phase 5: env capture settings, matcap sampling, and coordinate conversion were unified, but scene preview and export still run in separate WebGL contexts.
+- Remaining high-value work:
+  - Phase 8 manual regression verification across save/load/export/undo flows.
+  - Focused tests for snapshot normalization, restore invariants, and transform helpers.
+  - Optional follow-up cleanup for bundle size and any remaining direct atom array writes.
+
 ## Phase 0: Baseline and Repro Harness
 
 ### Scope
@@ -213,17 +230,12 @@
 - Refactored code paths are covered by repeatable checks.
 - Architecture and restore rules are documented for future contributors.
 
-## Suggested Execution Order
+## Remaining Execution Order
 
-1. Phase 0
-2. Phase 1
-3. Phase 2
-4. Phase 3
-5. Phase 4
-6. Phase 5
-7. Phase 6
-8. Phase 7
-9. Phase 8
+1. Phase 5 follow-up only if preview/export parity still shows drift in manual checks
+2. Phase 8 manual regression checklist
+3. Phase 8 focused tests
+4. Optional bundle and API cleanup
 
 ## Notes
 
