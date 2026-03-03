@@ -6,6 +6,12 @@ import { PointerEvent, Suspense, useCallback } from "react";
 import { toast } from "sonner";
 import * as THREE from "three";
 import { isLightPaintingAtom, lightsAtom, pointerAtom } from "../../store";
+import {
+  ENV_CAPTURE_FAR,
+  ENV_CAPTURE_NEAR,
+  ENV_CAPTURE_RESOLUTION,
+  sphericalToLatLon,
+} from "../../utils/coordinates";
 import { Env } from "../Env";
 import { Model } from "../Model";
 import { Cameras } from "./Cameras";
@@ -41,21 +47,14 @@ export function ScenePreview() {
 
       spherical.setFromVector3(reflected);
 
-      const lat = THREE.MathUtils.mapLinear(spherical.phi, 0, Math.PI, 1, -1);
-      const lon = THREE.MathUtils.mapLinear(
-        spherical.theta,
-        0.5 * Math.PI,
-        -1.5 * Math.PI,
-        -1,
-        1
-      );
+      const latlon = sphericalToLatLon(spherical);
 
       const { x, y, z } = point;
       setLights((lights) =>
         lights.map((l) => ({
           ...l,
           target: l.selected ? { x, y, z } : l.target,
-          latlon: l.selected ? { x: lon, y: lat } : l.latlon,
+          latlon: l.selected ? latlon : l.latlon,
         }))
       );
     },
@@ -119,9 +118,9 @@ export function ScenePreview() {
 
         <Suspense fallback={null}>
           <Environment
-            resolution={512}
-            far={100}
-            near={0.01}
+            resolution={ENV_CAPTURE_RESOLUTION}
+            far={ENV_CAPTURE_FAR}
+            near={ENV_CAPTURE_NEAR}
             frames={Infinity}
             background
           >

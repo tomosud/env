@@ -6,6 +6,11 @@ import { CubeMaterial } from "./CubeMaterial";
 import { useEffect, useRef } from "react";
 import { useSetAtom } from "jotai";
 import { envMapTextureAtom, sceneRendererAtom } from "../../store";
+import {
+  ENV_CAPTURE_FAR,
+  ENV_CAPTURE_NEAR,
+  ENV_CAPTURE_RESOLUTION,
+} from "../../utils/coordinates";
 
 const zero = new THREE.Vector3(0, 0, 0);
 const dir = new THREE.Vector3(0, 0, 0);
@@ -117,7 +122,9 @@ export function EnvMapPlane() {
             attach="map"
             compute={compute}
             frames={Infinity}
-            resolution={1024}
+            resolution={ENV_CAPTURE_RESOLUTION}
+            near={ENV_CAPTURE_NEAR}
+            far={ENV_CAPTURE_FAR}
           >
             <Env enableEvents />
           </RenderCubeTexture>

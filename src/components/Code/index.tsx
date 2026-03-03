@@ -4,7 +4,7 @@ import theme from "prism-react-renderer/themes/vsDark";
 import Highlight, { defaultProps } from "prism-react-renderer";
 import { useAtomValue } from "jotai";
 import { lightsAtom } from "../../store";
-import { latlonToPhiTheta } from "../../utils/coordinates";
+import { ENV_SPHERE_RADIUS, latlonToPhiTheta } from "../../utils/coordinates";
 
 export function Code() {
   const lights = useAtomValue(lightsAtom);
@@ -31,7 +31,7 @@ export function Env() {
     form="${light.shape}"
     intensity={${light.intensity}}
     position={new THREE.Vector3().setFromSphericalCoords(
-        3, // distance
+        ${ENV_SPHERE_RADIUS}, // distance
         ${phi},    // phi
         ${theta}  // theta
     )}

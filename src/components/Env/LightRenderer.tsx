@@ -16,7 +16,11 @@ import { ProceduralScrimLightMaterial } from "./ProceduralScrimLightMaterial";
 import { ProceduralUmbrellaLightMaterial } from "./ProceduralUmbrellaLightMaterial";
 import { SkyGradientLightMaterial } from "./SkyGradientLightMaterial";
 import { TextureLightMaterial } from "./TextureLightMaterial";
-import { latlonToPhiTheta } from "../../utils/coordinates";
+import {
+  ENV_SPHERE_RADIUS,
+  lightPositionFromLatLon,
+  updateLightLatLonByScreenDelta,
+} from "../../utils/coordinates";
 import { useGesture } from "@use-gesture/react";
 
 const SKY_GRADIENT_PICK_DISTANCE_OFFSET = 1_000_000;
@@ -36,15 +40,6 @@ const deprioritizedSkyGradientRaycast: THREE.Mesh["raycast"] = function (
     intersects[i].distance += SKY_GRADIENT_PICK_DISTANCE_OFFSET;
   }
 };
-
-function wrapSignedUnit(value: number) {
-  const wrapped = ((((value + 1) % 2) + 2) % 2) - 1;
-  return wrapped === 1 ? -1 : wrapped;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
 
 export function LightRenderer({
   index,
@@ -124,14 +119,15 @@ export function LightRenderer({
       onDrag: ({ delta: [x, y], event }) => {
         event.stopPropagation();
         setLight((l) => {
-          const lat = -y / (size.height / 2);
-          const lon = x / (size.width / 2);
           return {
             ...l,
-            latlon: {
-              x: wrapSignedUnit(l.latlon.x + lon),
-              y: clamp(l.latlon.y + lat, -1, 1),
-            },
+            latlon: updateLightLatLonByScreenDelta(
+              l.latlon,
+              x,
+              y,
+              size.width,
+              size.height
+            ),
           };
         });
       },
@@ -175,9 +171,7 @@ export function LightRenderer({
       return;
     }
 
-    const { phi, theta } = latlonToPhiTheta(light.latlon);
-
-    meshRef.current.position.setFromSphericalCoords(3, phi, theta);
+    meshRef.current.position.copy(lightPositionFromLatLon(light.latlon, ENV_SPHERE_RADIUS));
 
     meshRef.current.scale.setX(light.scale * light.scaleX);
     meshRef.current.scale.setY(light.scale * light.scaleY);
