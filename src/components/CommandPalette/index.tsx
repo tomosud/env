@@ -4,7 +4,6 @@ import {
   ChartBarIcon,
   LightBulbIcon,
   MagnifyingGlassIcon,
-  PhotoIcon,
 } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
@@ -94,17 +93,17 @@ export function CommandPalette() {
                 <LightBulbIcon className="w-5 h-5 text-white" />
               </Item>
               <Item
-                label="Procedural Scrim"
-                value="procedural_scrim"
-                subtitle="Simulated scrim light"
+                label="Circle"
+                value="procedural_disc"
+                subtitle="Soft procedural disc"
                 colorTheme="orange"
               >
                 <LightBulbIcon className="w-5 h-5 text-white" />
               </Item>
               <Item
-                label="Procedural Umbrella"
-                value="procedural_umbrella"
-                subtitle="Simulated umbrella light"
+                label="Square"
+                value="procedural_rect"
+                subtitle="Soft procedural square"
                 colorTheme="orange"
               >
                 <LightBulbIcon className="w-5 h-5 text-white" />
@@ -118,14 +117,6 @@ export function CommandPalette() {
                 </h3>
               }
             >
-              <Item
-                label="Sky"
-                value="sky"
-                subtitle="Simulated physical sky"
-                colorTheme="green"
-              >
-                <PhotoIcon className="w-5 h-5 text-white" />
-              </Item>
               <Item
                 label="Gradient"
                 value="sky_gradient"
@@ -144,11 +135,10 @@ export function CommandPalette() {
               <div className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 absolute w-16 h-16 rounded-full bg-white blur-3xl" />
             )}
             {value === "softbox" && <Softbox />}
-            {value === "procedural_scrim" && <Scrim />}
             {value === "umbrella" && <Umbrella />}
-            {value === "procedural_umbrella" && <Umbrella />}
             {value === "flash_head" && <FlashHead />}
-            {value === "sky" && <Sky />}
+            {value === "procedural_disc" && <Circle />}
+            {value === "procedural_rect" && <Square />}
             {value === "sky_gradient" && <Gradient />}
           </div>
         </div>
@@ -201,14 +191,6 @@ function Item({
         color: "#ffffff",
         map: withBasePath("textures/softbox-octagon.exr"),
       });
-    } else if (value === "procedural_scrim") {
-      addLight({
-        ...commonProps,
-        type: "procedural_scrim",
-        color: "#ffffff",
-        lightDistance: 0.3,
-        lightPosition: { x: 0, y: 0 },
-      });
     } else if (value === "umbrella") {
       addLight({
         ...commonProps,
@@ -223,12 +205,20 @@ function Item({
         color: "#ffffff",
         map: withBasePath("textures/flash-head.exr"),
       });
-    } else if (value === "procedural_umbrella") {
+    } else if (value === "procedural_disc") {
       addLight({
         ...commonProps,
-        type: "procedural_umbrella",
+        shape: "circle",
+        type: "procedural_disc",
         color: "#ffffff",
-        lightSides: 3,
+        blur: 0.1,
+      });
+    } else if (value === "procedural_rect") {
+      addLight({
+        ...commonProps,
+        type: "procedural_rect",
+        color: "#ffffff",
+        blur: 0.1,
       });
     } else if (value === "sky_gradient") {
       addLight({
@@ -282,17 +272,6 @@ function Softbox() {
   );
 }
 
-function Scrim() {
-  return (
-    <img
-      src={withBasePath("textures/scrim.png")}
-      alt="Scrim"
-      className="w-48 h-48"
-      loading="lazy"
-    />
-  );
-}
-
 function FlashHead() {
   return (
     <img
@@ -315,15 +294,12 @@ function Umbrella() {
   );
 }
 
-function Sky() {
-  return (
-    <img
-      src="https://tr.rbxcdn.com/c6742afbb50ca048d1fa07b532ecffb5/420/420/Hat/Png"
-      alt="Sky"
-      className="w-48 h-48"
-      loading="lazy"
-    />
-  );
+function Circle() {
+  return <div className="w-48 h-48 rounded-full bg-white" />;
+}
+
+function Square() {
+  return <div className="w-48 h-48 bg-white" />;
 }
 
 function Gradient() {

@@ -31,6 +31,8 @@ export type ProceduralUmbrellaLight = Extract<
   { type: "procedural_umbrella" }
 >;
 export type SkyGradientLight = Extract<Light, { type: "sky_gradient" }>;
+export type ProceduralDiscLight = Extract<Light, { type: "procedural_disc" }>;
+export type ProceduralRectLight = Extract<Light, { type: "procedural_rect" }>;
 
 type SceneHistoryState = {
   entries: SceneSnapshot[];
@@ -44,8 +46,8 @@ const defaultLightsData: SceneLight[] = [
   {
     name: "Light A",
     id: THREE.MathUtils.generateUUID(),
-    shape: "rect",
-    type: "procedural_scrim",
+    shape: "circle",
+    type: "procedural_disc",
     color: "#ffffff",
     latlon: { x: 0, y: 0 },
     intensity: 1,
@@ -58,8 +60,7 @@ const defaultLightsData: SceneLight[] = [
     opacity: 1,
     additive: false,
     animate: false,
-    lightDistance: 0.3,
-    lightPosition: { x: 0, y: 0 },
+    blur: 0.1,
   },
 ];
 

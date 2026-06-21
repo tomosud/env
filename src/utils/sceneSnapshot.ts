@@ -49,11 +49,25 @@ export type SkyGradientLightData = BaseLightData & {
   color2: string;
 };
 
+export type ProceduralDiscLightData = BaseLightData & {
+  type: "procedural_disc";
+  color: string;
+  blur: number;
+};
+
+export type ProceduralRectLightData = BaseLightData & {
+  type: "procedural_rect";
+  color: string;
+  blur: number;
+};
+
 export type SceneLight =
   | TextureLightData
   | ProceduralScrimLightData
   | ProceduralUmbrellaLightData
-  | SkyGradientLightData;
+  | SkyGradientLightData
+  | ProceduralDiscLightData
+  | ProceduralRectLightData;
 
 export type SceneCamera = {
   id: string;
@@ -252,6 +266,20 @@ function normalizeLight(raw: unknown, index: number): SceneLight | null {
         type: "sky_gradient",
         color: asString(raw.color, "#ffffff"),
         color2: asString(raw.color2, "#000000"),
+      };
+    case "procedural_disc":
+      return {
+        ...base,
+        type: "procedural_disc",
+        color: asString(raw.color, "#ffffff"),
+        blur: clamp(asFiniteNumber(raw.blur, 0.1), 0, 10),
+      };
+    case "procedural_rect":
+      return {
+        ...base,
+        type: "procedural_rect",
+        color: asString(raw.color, "#ffffff"),
+        blur: clamp(asFiniteNumber(raw.blur, 0.1), 0, 10),
       };
     default:
       return null;

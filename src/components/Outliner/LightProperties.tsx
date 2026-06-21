@@ -22,6 +22,7 @@ type PaneLightModel = {
   lightPosition?: { x: number; y: number };
   lightDistance?: number;
   color2?: string;
+  blur?: number;
 };
 
 function createPaneModel(light: Light): PaneLightModel {
@@ -46,6 +47,10 @@ function createPaneModel(light: Light): PaneLightModel {
     lightDistance:
       light.type === "procedural_scrim" ? light.lightDistance : undefined,
     color2: light.type === "sky_gradient" ? light.color2 : undefined,
+    blur:
+      light.type === "procedural_disc" || light.type === "procedural_rect"
+        ? light.blur
+        : undefined,
   };
 }
 
@@ -199,6 +204,15 @@ export function LightProperties({
     if (light.type === "sky_gradient") {
       pane
         .addBinding(paneModelRef.current, "color2")
+        .on("change", handleBindingChange);
+    }
+
+    if (
+      light.type === "procedural_disc" ||
+      light.type === "procedural_rect"
+    ) {
+      pane
+        .addBinding(paneModelRef.current, "blur", { min: 0, max: 10, step: 0.01 })
         .on("change", handleBindingChange);
     }
 

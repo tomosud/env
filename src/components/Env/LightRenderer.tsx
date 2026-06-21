@@ -5,6 +5,8 @@ import { useRef, useState } from "react";
 import * as THREE from "three";
 import {
   Light,
+  ProceduralDiscLight,
+  ProceduralRectLight,
   ProceduralScrimLight,
   ProceduralUmbrellaLight,
   SkyGradientLight,
@@ -13,6 +15,8 @@ import {
   selectLightAtom,
   updateLightByIdAtom,
 } from "../../store";
+import { ProceduralDiscLightMaterial } from "./ProceduralDiscLightMaterial";
+import { ProceduralRectLightMaterial } from "./ProceduralRectLightMaterial";
 import { ProceduralScrimLightMaterial } from "./ProceduralScrimLightMaterial";
 import { ProceduralUmbrellaLightMaterial } from "./ProceduralUmbrellaLightMaterial";
 import { SkyGradientLightMaterial } from "./SkyGradientLightMaterial";
@@ -22,6 +26,7 @@ import {
   lightPositionFromLatLon,
   updateLightLatLonByScreenDelta,
 } from "../../utils/coordinates";
+import { padForBlur } from "../../utils/proceduralBlur";
 import { useGesture } from "@use-gesture/react";
 
 const SKY_GRADIENT_PICK_DISTANCE_OFFSET = 1_000_000;
@@ -182,8 +187,15 @@ export function LightRenderer({
 
     meshRef.current.position.copy(lightPositionFromLatLon(light.latlon, ENV_SPHERE_RADIUS));
 
-    meshRef.current.scale.setX(light.scale * light.scaleX);
-    meshRef.current.scale.setY(light.scale * light.scaleY);
+    // Procedural disc/rect enlarge the quad with blur so the soft tail has room
+    // to spread beyond the shape without being clipped at the quad border.
+    const pad =
+      light.type === "procedural_disc" || light.type === "procedural_rect"
+        ? padForBlur(light.blur)
+        : 1;
+
+    meshRef.current.scale.setX(light.scale * light.scaleX * pad);
+    meshRef.current.scale.setY(light.scale * light.scaleY * pad);
     meshRef.current.scale.setZ(light.scale);
 
     meshRef.current.lookAt(light.target.x, light.target.y, light.target.z);
@@ -238,6 +250,16 @@ export function LightRenderer({
       {light.type === "procedural_umbrella" && (
         <ProceduralUmbrellaLightMaterial
           lightAtom={lightAtom as PrimitiveAtom<ProceduralUmbrellaLight>}
+        />
+      )}
+      {light.type === "procedural_disc" && (
+        <ProceduralDiscLightMaterial
+          lightAtom={lightAtom as PrimitiveAtom<ProceduralDiscLight>}
+        />
+      )}
+      {light.type === "procedural_rect" && (
+        <ProceduralRectLightMaterial
+          lightAtom={lightAtom as PrimitiveAtom<ProceduralRectLight>}
         />
       )}
     </mesh>
