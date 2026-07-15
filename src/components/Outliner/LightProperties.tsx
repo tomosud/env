@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Pane } from "tweakpane";
 import { Light, isLightPaintingAtom, updateLightByIdAtom } from "../../store";
+import { AdvancedColorPicker } from "./AdvancedColorPicker";
 
 type PaneLightModel = {
   name: string;
@@ -39,7 +40,8 @@ function createPaneModel(light: Light): PaneLightModel {
     opacity: light.opacity,
     additive: light.additive,
     type: light.type,
-    lightSides: light.type === "procedural_umbrella" ? light.lightSides : undefined,
+    lightSides:
+      light.type === "procedural_umbrella" ? light.lightSides : undefined,
     lightPosition:
       light.type === "procedural_scrim"
         ? structuredClone(light.lightPosition)
@@ -91,11 +93,16 @@ export function LightProperties({
     const pane = new Pane({ container: containerRef.current, expanded: true });
     paneRef.current = pane;
 
-    const handleBindingChange = (event: { target: { key: string }; value: unknown }) => {
+    const handleBindingChange = (event: {
+      target: { key: string };
+      value: unknown;
+    }) => {
       updateLightValue(event.target.key, event.value);
     };
 
-    pane.addBinding(paneModelRef.current, "name").on("change", handleBindingChange);
+    pane
+      .addBinding(paneModelRef.current, "name")
+      .on("change", handleBindingChange);
 
     pane.addBlade({ view: "separator" });
 
@@ -155,11 +162,6 @@ export function LightProperties({
 
     pane.addBlade({ view: "separator" });
 
-    if ("color" in paneModelRef.current) {
-      pane
-        .addBinding(paneModelRef.current, "color")
-        .on("change", handleBindingChange);
-    }
     pane
       .addBinding(paneModelRef.current, "intensity", {
         min: 0,
@@ -201,18 +203,13 @@ export function LightProperties({
         .on("change", handleBindingChange);
     }
 
-    if (light.type === "sky_gradient") {
+    if (light.type === "procedural_disc" || light.type === "procedural_rect") {
       pane
-        .addBinding(paneModelRef.current, "color2")
-        .on("change", handleBindingChange);
-    }
-
-    if (
-      light.type === "procedural_disc" ||
-      light.type === "procedural_rect"
-    ) {
-      pane
-        .addBinding(paneModelRef.current, "blur", { min: 0, max: 10, step: 0.01 })
+        .addBinding(paneModelRef.current, "blur", {
+          min: 0,
+          max: 10,
+          step: 0.01,
+        })
         .on("change", handleBindingChange);
     }
 
@@ -220,7 +217,13 @@ export function LightProperties({
       paneRef.current = null;
       pane.dispose();
     };
-  }, [isLightPainting, light.id, light.type, setLightPainting, updateLightValue]);
+  }, [
+    isLightPainting,
+    light.id,
+    light.type,
+    setLightPainting,
+    updateLightValue,
+  ]);
 
   useEffect(() => {
     const pane = paneRef.current;
@@ -232,5 +235,23 @@ export function LightProperties({
     pane.refresh();
   }, [light]);
 
-  return <div ref={containerRef} />;
+  return (
+    <div className="light-properties">
+      {"color" in light && (
+        <AdvancedColorPicker
+          label="color"
+          value={light.color}
+          onChange={(value) => updateLightValue("color", value)}
+        />
+      )}
+      {light.type === "sky_gradient" && (
+        <AdvancedColorPicker
+          label="color2"
+          value={light.color2}
+          onChange={(value) => updateLightValue("color2", value)}
+        />
+      )}
+      <div ref={containerRef} />
+    </div>
+  );
 }

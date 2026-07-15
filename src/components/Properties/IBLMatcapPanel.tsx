@@ -1,4 +1,8 @@
-import { ArrowDownTrayIcon } from "@heroicons/react/24/solid";
+import {
+  ArrowDownTrayIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from "@heroicons/react/24/solid";
 import { useAtom, useAtomValue } from "jotai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -79,6 +83,7 @@ export function IBLMatcapPanel() {
   const [iblRotation, setIblRotation] = useAtom(iblRotationAtom);
   const [matcapMirrorX, setMatcapMirrorX] = useAtom(matcapMirrorXAtom);
   const [resolution, setResolution] = useState<ExportResolution>("2k");
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isSavingPNG, setIsSavingPNG] = useState(false);
   const [isSavingHDR, setIsSavingHDR] = useState(false);
   const [isSavingEXR, setIsSavingEXR] = useState(false);
@@ -133,13 +138,7 @@ export function IBLMatcapPanel() {
         window.cancelAnimationFrame(rafId);
       }
     };
-  }, [
-    redrawPreview,
-    historyIndex,
-    sceneSnapshot,
-    texture,
-    renderer,
-  ]);
+  }, [redrawPreview, historyIndex, sceneSnapshot, texture, renderer]);
 
   async function handleSavePNG() {
     if (!texture || !renderer) {
@@ -259,7 +258,9 @@ export function IBLMatcapPanel() {
           `Saved ${normalizedImageBasename}_matcap.hdr to ${saveResult.directoryName}`
         );
       } else {
-        toast.success(`Saved matcap HDR + settings (${outputSize}x${outputSize})`);
+        toast.success(
+          `Saved matcap HDR + settings (${outputSize}x${outputSize})`
+        );
       }
     } catch (error) {
       console.error(error);
@@ -318,7 +319,9 @@ export function IBLMatcapPanel() {
           `Saved ${normalizedImageBasename}_matcap.exr to ${saveResult.directoryName}`
         );
       } else {
-        toast.success(`Saved matcap EXR + settings (${outputSize}x${outputSize})`);
+        toast.success(
+          `Saved matcap EXR + settings (${outputSize}x${outputSize})`
+        );
       }
     } catch (error) {
       console.error(error);
@@ -334,11 +337,40 @@ export function IBLMatcapPanel() {
         <h3 className="text-[10px] tracking-widest uppercase text-white/80">
           IBL Matcap
         </h3>
-        <span className="text-[10px] text-white/50">{rotationDeg} deg</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-white/50">{rotationDeg} deg</span>
+          <button
+            type="button"
+            className="grid h-5 w-5 place-items-center rounded text-white/50 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-400"
+            aria-label={
+              isExpanded ? "Collapse IBL Matcap" : "Expand IBL Matcap"
+            }
+            aria-expanded={isExpanded}
+            onClick={() => setIsExpanded((current) => !current)}
+          >
+            {isExpanded ? (
+              <ChevronUpIcon className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDownIcon className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-stretch gap-3">
-        <div className="flex-1 basis-[190px] min-w-[160px] max-w-[256px] aspect-square rounded bg-black/60 overflow-hidden ring-1 ring-white/10">
+      <div
+        className={
+          isExpanded
+            ? "flex flex-wrap items-stretch gap-3"
+            : "flex items-center gap-2"
+        }
+      >
+        <div
+          className={
+            isExpanded
+              ? "flex-1 basis-[190px] min-w-[160px] max-w-[256px] aspect-square rounded bg-black/60 overflow-hidden ring-1 ring-white/10"
+              : "h-12 w-12 flex-none rounded bg-black/60 overflow-hidden ring-1 ring-white/10"
+          }
+        >
           <canvas
             ref={previewCanvasRef}
             width={PREVIEW_SIZE}
@@ -347,7 +379,13 @@ export function IBLMatcapPanel() {
           />
         </div>
 
-        <div className="flex-1 basis-[180px] min-w-[160px] flex flex-col justify-between gap-3">
+        <div
+          className={
+            isExpanded
+              ? "flex-1 basis-[180px] min-w-[160px] flex flex-col justify-between gap-3"
+              : "min-w-0 flex-1"
+          }
+        >
           <div>
             <label className="block text-[10px] tracking-wider uppercase text-white/60 mb-1">
               IBL Yaw
@@ -367,62 +405,66 @@ export function IBLMatcapPanel() {
             />
           </div>
 
-          <div>
-            <label className="block text-[10px] tracking-wider uppercase text-white/60 mb-1">
-              Export resolution
-            </label>
-            <select
-              className="w-full h-7 rounded-md bg-neutral-900 ring-1 ring-white/20 px-2 text-[10px] uppercase tracking-wide"
-              value={resolution}
-              onChange={(event) =>
-                setResolution(event.target.value as ExportResolution)
-              }
-              disabled={isSavingHDR}
-            >
-              <option value="1k">1k</option>
-              <option value="2k">2k</option>
-              <option value="4k">4k</option>
-            </select>
-          </div>
+          {isExpanded && (
+            <>
+              <div>
+                <label className="block text-[10px] tracking-wider uppercase text-white/60 mb-1">
+                  Export resolution
+                </label>
+                <select
+                  className="w-full h-7 rounded-md bg-neutral-900 ring-1 ring-white/20 px-2 text-[10px] uppercase tracking-wide"
+                  value={resolution}
+                  onChange={(event) =>
+                    setResolution(event.target.value as ExportResolution)
+                  }
+                  disabled={isSavingHDR}
+                >
+                  <option value="1k">1k</option>
+                  <option value="2k">2k</option>
+                  <option value="4k">4k</option>
+                </select>
+              </div>
 
-          <label className="flex items-center gap-2 text-[10px] tracking-wider uppercase text-white/70 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={matcapMirrorX}
-              onChange={(event) => setMatcapMirrorX(event.target.checked)}
-              className="h-3.5 w-3.5 accent-blue-500"
-            />
-            Mirror left / right
-          </label>
+              <label className="flex items-center gap-2 text-[10px] tracking-wider uppercase text-white/70 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={matcapMirrorX}
+                  onChange={(event) => setMatcapMirrorX(event.target.checked)}
+                  className="h-3.5 w-3.5 accent-blue-500"
+                />
+                Mirror left / right
+              </label>
 
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              className="flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={handleSavePNG}
-              disabled={!canSavePNG}
-            >
-              <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
-              PNG
-            </button>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  className="flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleSavePNG}
+                  disabled={!canSavePNG}
+                >
+                  <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
+                  PNG
+                </button>
 
-            <button
-              className="flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={handleSaveHDR}
-              disabled={!canSaveHDR}
-            >
-              <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
-              HDR
-            </button>
+                <button
+                  className="flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleSaveHDR}
+                  disabled={!canSaveHDR}
+                >
+                  <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
+                  HDR
+                </button>
 
-            <button
-              className="flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={handleSaveEXR}
-              disabled={!canSaveEXR}
-            >
-              <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
-              EXR
-            </button>
-          </div>
+                <button
+                  className="flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleSaveEXR}
+                  disabled={!canSaveEXR}
+                >
+                  <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
+                  EXR
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
