@@ -1,7 +1,7 @@
 import { Sphere, useCursor } from "@react-three/drei";
-import { ThreeEvent, useFrame, useThree } from "@react-three/fiber";
+import { ThreeEvent, useThree } from "@react-three/fiber";
 import { PrimitiveAtom, useAtomValue, useSetAtom } from "jotai";
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useLayoutEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import {
   Light,
@@ -180,7 +180,7 @@ export function LightRenderer({
     }
   );
 
-  useFrame(() => {
+  useLayoutEffect(() => {
     if (!meshRef.current) {
       return;
     }
@@ -201,7 +201,11 @@ export function LightRenderer({
     meshRef.current.lookAt(light.target.x, light.target.y, light.target.z);
     meshRef.current.rotateZ(light.rotation);
     meshRef.current.updateMatrix();
-  }, -2);
+    // Pointer events can run before a demand-driven canvas renders its next
+    // frame. Keep matrixWorld current so a light added to an empty scene is
+    // immediately raycastable in the panorama.
+    meshRef.current.updateWorldMatrix(true, false);
+  }, [light]);
 
   if (light.type === "sky_gradient") {
     return (

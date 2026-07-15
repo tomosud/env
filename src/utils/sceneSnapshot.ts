@@ -370,7 +370,10 @@ export function createSceneSnapshot(
   iblRotation: number,
   matcapMirrorX = false
 ): SceneSnapshot {
-  const normalizedLights = normalizeLights(lights);
+  // An empty environment is a valid authored scene. Falling back to Light A
+  // here creates a phantom light with a new id every time a snapshot is made,
+  // which desynchronizes rendering and pointer selection until a reload.
+  const normalizedLights = normalizeLights(lights, true);
   const normalizedCameras = normalizeCameras(cameras);
   const selectedCameraId = normalizedCameras.some(
     (camera) => camera.id === activeCameraId
