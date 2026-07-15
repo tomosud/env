@@ -34,6 +34,7 @@
     "react-resizable-panels": "^0.0.51",
     "sonner": "^0.4.0",
     "three": "^0.153.0",
+    "three-mesh-bvh": "^0.6.8",
     "three-stdlib": "^2.27.3",
     "tunnel-rat": "^0.1.2",
     "tweakpane": "^4.0.0"

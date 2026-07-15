@@ -1,5 +1,5 @@
 import { BoltIcon } from "@heroicons/react/24/solid";
-import { Bvh, Environment, PerformanceMonitor } from "@react-three/drei";
+import { Environment, PerformanceMonitor } from "@react-three/drei";
 import { Canvas, ThreeEvent } from "@react-three/fiber";
 import { useAtomValue, useSetAtom } from "jotai";
 import { PointerEvent, Suspense, useCallback } from "react";
@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import * as THREE from "three";
 import {
   isLightPaintingAtom,
+  modelUrlAtom,
   pointerAtom,
   updateSelectedLightsPlacementAtom,
 } from "../../store";
@@ -24,6 +25,7 @@ import { Cameras } from "./Cameras";
 import { Controls } from "./Controls";
 import { Debug } from "./Debug";
 import { Lights } from "./Lights";
+import { StableBvh } from "./StableBvh";
 
 const plusZ = new THREE.Vector3(0, 0, 1);
 const spherical = new THREE.Spherical();
@@ -33,6 +35,7 @@ export function ScenePreview() {
     updateSelectedLightsPlacementAtom
   );
   const isLightPainting = useAtomValue(isLightPaintingAtom);
+  const modelUrl = useAtomValue(modelUrlAtom);
 
   const handleModelClick = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
@@ -114,13 +117,13 @@ export function ScenePreview() {
         <Lights ambientLightIntensity={0.2} />
 
         <Suspense fallback={null}>
-          <Bvh firstHitOnly>
+          <StableBvh firstHitOnly rebuildKey={modelUrl}>
             <Model
               debugMaterial={false}
               onClick={handleModelClick}
               onPointerMove={handleModelPointerMove}
             />
-          </Bvh>
+          </StableBvh>
         </Suspense>
 
         <Suspense fallback={null}>

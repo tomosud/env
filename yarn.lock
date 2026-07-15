@@ -2581,6 +2581,7 @@ __metadata:
     sonner: ^0.4.0
     tailwindcss: ^3.2.6
     three: ^0.153.0
+    three-mesh-bvh: ^0.6.8
     three-stdlib: ^2.27.3
     tunnel-rat: ^0.1.2
     tweakpane: ^4.0.0
@@ -4036,7 +4037,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"three-mesh-bvh@npm:^0.6.7":
+"three-mesh-bvh@npm:^0.6.7, three-mesh-bvh@npm:^0.6.8":
   version: 0.6.8
   resolution: "three-mesh-bvh@npm:0.6.8"
   peerDependencies:
