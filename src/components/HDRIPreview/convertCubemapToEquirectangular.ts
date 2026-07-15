@@ -94,22 +94,17 @@ export default function convertCubemapToEquirectangular(
     colorSpace,
   });
 
-  const viewport = renderer.getViewport(new THREE.Vector4());
-  const scissor = renderer.getScissor(new THREE.Vector4());
-  const scissorTest = renderer.getScissorTest();
   const previousTarget = renderer.getRenderTarget();
 
+  // setRenderTarget applies the render target's own full-size viewport/scissor.
+  // Never call renderer.setViewport/setScissor here: those are in CSS pixels and
+  // get multiplied by the renderer's pixelRatio, so any devicePixelRatio != 1
+  // (browser zoom, Windows display scaling, HiDPI) would render a scaled
+  // bottom-left crop into the target and corrupt every export and matcap.
   renderer.setRenderTarget(renderTarget);
-  renderer.setViewport(0, 0, width, height);
-  renderer.setScissor(0, 0, width, height);
-  renderer.setScissorTest(false);
   renderer.render(scene, camera);
 
-  // Restore renderer state
   renderer.setRenderTarget(previousTarget);
-  renderer.setViewport(viewport);
-  renderer.setScissor(scissor);
-  renderer.setScissorTest(scissorTest);
 
   geometry.dispose();
   material.dispose();

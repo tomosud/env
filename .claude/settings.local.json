@@ -6,7 +6,13 @@
       "Bash(gh api:*)",
       "Bash(git:*)",
       "Bash(node_modules/.bin/tsc:*)",
-      "PowerShell(npx tsc --noEmit -p tsconfig.json)"
+      "PowerShell(npx tsc --noEmit -p tsconfig.json)",
+      "mcp__puppeteer__puppeteer_navigate",
+      "mcp__puppeteer__puppeteer_evaluate",
+      "mcp__puppeteer__puppeteer_screenshot",
+      "Bash(yarn build *)",
+      "PowerShell(yarn build 2>&1)",
+      "PowerShell(yarn.cmd build 2>&1)"
     ]
   }
 }
