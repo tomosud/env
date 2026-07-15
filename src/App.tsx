@@ -223,18 +223,26 @@ function SettingsDropZone({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const isSceneHistoryHydrated = useAtomValue(sceneHistoryAtom).hydrated;
+
   return (
     <>
       <Toaster theme="dark" richColors position="bottom-center" />
       <SceneHistoryPersistence />
       <ProjectDirectoryPersistence />
-      <CommandPalette />
-      <SettingsDropZone>
-        <AppLayout>
-          <AppToolbar />
-          <AppContent />
-        </AppLayout>
-      </SettingsDropZone>
+      {isSceneHistoryHydrated ? (
+        <>
+          <CommandPalette />
+          <SettingsDropZone>
+            <AppLayout>
+              <AppToolbar />
+              <AppContent />
+            </AppLayout>
+          </SettingsDropZone>
+        </>
+      ) : (
+        <div className="h-full w-full bg-neutral-950" aria-label="Loading scene" />
+      )}
     </>
   );
 }

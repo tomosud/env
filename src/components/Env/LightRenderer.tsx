@@ -1,7 +1,7 @@
 import { Sphere, useCursor } from "@react-three/drei";
 import { ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { PrimitiveAtom, useAtomValue, useSetAtom } from "jotai";
-import { useRef, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import * as THREE from "three";
 import {
   Light,
@@ -243,9 +243,20 @@ export function LightRenderer({
         />
       )}
       {light.type === "texture" && (
-        <TextureLightMaterial
-          lightAtom={lightAtom as PrimitiveAtom<TextureLight>}
-        />
+        <Suspense
+          fallback={
+            <meshBasicMaterial
+              transparent
+              opacity={0}
+              depthWrite={false}
+              colorWrite={false}
+            />
+          }
+        >
+          <TextureLightMaterial
+            lightAtom={lightAtom as PrimitiveAtom<TextureLight>}
+          />
+        </Suspense>
       )}
       {light.type === "procedural_umbrella" && (
         <ProceduralUmbrellaLightMaterial

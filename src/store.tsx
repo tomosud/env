@@ -419,6 +419,8 @@ export const duplicateLightAtom = atom(
 
 export const addLightAtom = atom(null, (_get, set, light: SceneLight) => {
   set(lightsDataStateAtom, (lights) => [...lights, structuredClone(light)]);
+  set(selectedLightIdStateAtom, light.id);
+  set(soloLightIdStateAtom, null);
   set(sceneDirtyAtom, true);
 });
 
