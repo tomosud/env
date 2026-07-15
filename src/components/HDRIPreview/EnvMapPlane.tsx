@@ -4,8 +4,12 @@ import { ComputeFunction, useFrame, useThree } from "@react-three/fiber";
 import { Env } from "../Env";
 import { CubeMaterial } from "./CubeMaterial";
 import { useEffect, useRef } from "react";
-import { useSetAtom } from "jotai";
-import { envMapTextureAtom, sceneRendererAtom } from "../../store";
+import { useAtomValue, useSetAtom } from "jotai";
+import {
+  envMapTextureAtom,
+  lightIdsAtom,
+  sceneRendererAtom,
+} from "../../store";
 import { OnDemandCubemapCapture } from "../Env/OnDemandCubemapCapture";
 import {
   ENV_CAPTURE_FAR,
@@ -55,6 +59,7 @@ export function EnvMapPlane() {
   const lastTextureRef = useRef<THREE.CubeTexture | null>(null);
   const viewport = useThree((state) => state.viewport);
   const renderer = useThree((state) => state.gl);
+  const hasLights = useAtomValue(lightIdsAtom).length > 0;
   const setTexture = useSetAtom(envMapTextureAtom);
   const setRenderer = useSetAtom(sceneRendererAtom);
 
@@ -125,6 +130,10 @@ export function EnvMapPlane() {
         <planeGeometry />
         <CubeMaterial>
           <RenderCubeTexture
+            // Recreate Drei's event portal when an empty environment gains its
+            // first light. Its interaction registry otherwise retains the
+            // empty state until the page is reloaded.
+            key={hasLights ? "with-lights" : "without-lights"}
             ref={cubeCaptureRef}
             attach="map"
             compute={compute}
