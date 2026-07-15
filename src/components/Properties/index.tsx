@@ -14,7 +14,7 @@ export function Properties() {
         <PropertiesPanelTunnel.Out />
       </div>
 
-      <div className="p-2 border-t border-white/10 flex justify-end">
+      <div className="p-2 border-t border-white/10">
         <IBLMatcapPanel />
       </div>
     </div>

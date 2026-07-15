@@ -233,6 +233,7 @@ const camerasDataStateAtom = atom<SceneCamera[]>(
 );
 const selectedCameraIdStateAtom = atom<string>(defaultSceneSnapshot.activeCameraId);
 const iblRotationStateAtom = atom<number>(0);
+const matcapMirrorXStateAtom = atom(false);
 const isApplyingSceneSnapshotAtom = atom(false);
 const sceneDirtyAtom = atom(false);
 
@@ -286,7 +287,8 @@ export const currentSceneSnapshotAtom = atom((get) =>
     get(lightsDataStateAtom),
     get(camerasDataStateAtom),
     get(selectedCameraIdStateAtom),
-    get(iblRotationStateAtom)
+    get(iblRotationStateAtom),
+    get(matcapMirrorXStateAtom)
   )
 );
 
@@ -323,7 +325,8 @@ export const lightsAtom = atom(
       nextState.lightsData,
       get(camerasDataStateAtom),
       get(selectedCameraIdStateAtom),
-      get(iblRotationStateAtom)
+      get(iblRotationStateAtom),
+      get(matcapMirrorXStateAtom)
     );
 
     set(lightsDataStateAtom, normalizedSnapshot.lights);
@@ -511,7 +514,8 @@ export const camerasAtom = atom(
       cameraExists(nextState.camerasData, nextState.selectedCameraId)
         ? nextState.selectedCameraId!
         : get(selectedCameraIdStateAtom),
-      get(iblRotationStateAtom)
+      get(iblRotationStateAtom),
+      get(matcapMirrorXStateAtom)
     );
 
     set(camerasDataStateAtom, normalizedSnapshot.cameras);
@@ -529,6 +533,14 @@ export const iblRotationAtom = atom(
   (get) => get(iblRotationStateAtom),
   (_get, set, value: number) => {
     set(iblRotationStateAtom, value);
+    set(sceneDirtyAtom, true);
+  }
+);
+
+export const matcapMirrorXAtom = atom(
+  (get) => get(matcapMirrorXStateAtom),
+  (_get, set, value: boolean) => {
+    set(matcapMirrorXStateAtom, value);
     set(sceneDirtyAtom, true);
   }
 );
@@ -638,6 +650,7 @@ function applySnapshotState(set: any, snapshot: SceneSnapshot) {
   set(selectedLightIdStateAtom, null);
   set(soloLightIdStateAtom, null);
   set(iblRotationStateAtom, snapshot.iblRotation);
+  set(matcapMirrorXStateAtom, snapshot.matcapMirrorX);
 }
 
 export const applySceneSnapshotAtom = atom(
@@ -647,7 +660,8 @@ export const applySceneSnapshotAtom = atom(
       snapshot.lights,
       snapshot.cameras,
       snapshot.activeCameraId,
-      snapshot.iblRotation
+      snapshot.iblRotation,
+      snapshot.matcapMirrorX
     );
     set(isApplyingSceneSnapshotAtom, true);
     applySnapshotState(set, nextSnapshot);

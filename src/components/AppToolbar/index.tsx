@@ -3,17 +3,13 @@ import {
   ArrowTopRightOnSquareIcon,
   ArrowUturnLeftIcon,
   ArrowUturnRightIcon,
-  CodeBracketIcon,
   FolderOpenIcon,
-  PaintBrushIcon,
-  PhotoIcon,
 } from "@heroicons/react/24/solid";
 import * as Toolbar from "@radix-ui/react-toolbar";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  activeModesAtom,
   applySceneSnapshotAtom,
   canRedoSceneAtom,
   canUndoSceneAtom,
@@ -21,7 +17,6 @@ import {
   envMapTextureAtom,
   imageBasenameAtom,
   jsonSaveFilenameAtom,
-  modeAtom,
   projectDirectoryHandleAtom,
   redoSceneAtom,
   sceneRendererAtom,
@@ -65,8 +60,6 @@ function getModeButtonClass(active: boolean) {
 }
 
 export function AppToolbar() {
-  const setMode = useSetAtom(modeAtom);
-  const activeModes = useAtomValue(activeModesAtom);
   const texture = useAtomValue(envMapTextureAtom);
   const renderer = useAtomValue(sceneRendererAtom);
   const sceneSnapshot = useAtomValue(currentSceneSnapshotAtom);
@@ -356,54 +349,16 @@ export function AppToolbar() {
       aria-label="Editing options"
       className="flex items-center justify-between min-w-[max-content] px-4 pt-1 gap-4"
     >
-      <span className="p-3 flex items-center gap-4">
-        <Logo />
-        <h1 className="font-bold tracking-wide text-xl">Env</h1>
-      </span>
-
-      <Toolbar.ToggleGroup
-        type="multiple"
-        aria-label="Tools"
-        className="flex divide-x divide-white/10 bg-neutral-900 rounded-md overflow-hidden shadow-inner shadow-white/5 ring-offset-white/10 ring-offset-1 ring-1 ring-black/20"
-        value={activeModes}
-        onValueChange={(modes) =>
-          setMode(
-            modes.reduce((acc, mode) => ({ ...acc, [mode]: true }), {
-              scene: false,
-              code: false,
-              hdri: false,
-            })
-          )
-        }
+      <a
+        href="https://github.com/tomosud/env"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="ENVmod on GitHub"
+        className="p-3 flex items-center gap-4"
       >
-        {[
-          {
-            value: "scene",
-            label: "Scene",
-            icon: PaintBrushIcon,
-          },
-          {
-            value: "code",
-            label: "Code",
-            icon: CodeBracketIcon,
-          },
-          {
-            value: "hdri",
-            label: "HDRI",
-            icon: PhotoIcon,
-          },
-        ].map(({ value, label, icon: Icon }) => (
-          <Toolbar.ToggleItem
-            key={value}
-            value={value}
-            disabled={value === "scene"}
-            className="px-3 py-1.5 leading-4 text-xs tracking-wide uppercase font-semibold bg-white/0 hover:bg-white/10 bg-gradient-to-b data-[state=on]:from-blue-500 data-[state=on]:to-blue-600 data-[state=on]:text-white flex items-center"
-          >
-            <Icon className="w-4 h-4 mr-2" />
-            <span>{label}</span>
-          </Toolbar.ToggleItem>
-        ))}
-      </Toolbar.ToggleGroup>
+        <Logo />
+        <h1 className="font-bold tracking-wide text-xl">ENVmod</h1>
+      </a>
 
       <div className="flex items-center gap-2 ml-auto">
         <button
@@ -523,12 +478,12 @@ export function AppToolbar() {
       </div>
 
       <Toolbar.Link
-        href="https://github.com/tomosud/env"
+        href="https://github.com/pmndrs/env#MIT-1-ov-file"
         target="_blank"
         rel="noopener noreferrer"
         className="flex justify-center items-center text-xs px-3 py-1.5 leading-4 tracking-wide uppercase font-semibold bg-white/0 hover:bg-white/100 text-white hover:text-black rounded-md transition-all duration-500 ease-in-out"
       >
-        <span>Source Code</span>
+        <span>MIT License</span>
         <ArrowTopRightOnSquareIcon className="w-4 h-4 ml-2" />
       </Toolbar.Link>
     </Toolbar.Root>

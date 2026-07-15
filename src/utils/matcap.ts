@@ -31,6 +31,13 @@ function directionToEquirectUV(
   };
 }
 
+function alignReflectionToPanoramaFront(x: number, y: number, z: number) {
+  // The equirectangular preview's horizontal center points toward -X, while
+  // the center of the matcap reflection points toward +Z. Rotate -90 degrees
+  // around Y so both views share the same front direction.
+  return { x: -z, y, z: x };
+}
+
 export function sampleEquirectPixels(
   texture: THREE.CubeTexture,
   renderer: THREE.WebGLRenderer,
@@ -68,7 +75,8 @@ export function buildMatcapUint8RGBAFromEquirect(
   pixels: Uint8Array,
   sourceWidth: number,
   sourceHeight: number,
-  outputSize: number
+  outputSize: number,
+  mirrorX = false
 ) {
   const target = new Uint8ClampedArray(outputSize * outputSize * 4);
   const radius = (outputSize - 1) * 0.5;
@@ -124,13 +132,20 @@ export function buildMatcapUint8RGBAFromEquirect(
       }
 
       const nz = Math.sqrt(1 - r2);
-      const normalX = nx;
+      const normalX = mirrorX ? -nx : nx;
       const normalY = -ny;
       const normalZ = nz;
       const rx = 2 * normalZ * normalX;
       const ry = 2 * normalZ * normalY;
       const rz = -1 + 2 * normalZ * normalZ;
-      const { u, v } = directionToEquirectUV(rx, ry, rz, invTwoPi, invPi);
+      const aligned = alignReflectionToPanoramaFront(rx, ry, rz);
+      const { u, v } = directionToEquirectUV(
+        aligned.x,
+        aligned.y,
+        aligned.z,
+        invTwoPi,
+        invPi
+      );
       const [r, g, b] = sampleBilinear(u, v);
       target[ti] = r;
       target[ti + 1] = g;
@@ -146,7 +161,8 @@ export function buildMatcapFloatRGBFromEquirect(
   equirectRgba: Float32Array,
   sourceWidth: number,
   sourceHeight: number,
-  outputSize: number
+  outputSize: number,
+  mirrorX = false
 ) {
   const output = new Float32Array(outputSize * outputSize * 3);
   const radius = (outputSize - 1) * 0.5;
@@ -203,13 +219,20 @@ export function buildMatcapFloatRGBFromEquirect(
       }
 
       const nz = Math.sqrt(1 - r2);
-      const normalX = nx;
+      const normalX = mirrorX ? -nx : nx;
       const normalY = -ny;
       const normalZ = nz;
       const rx = 2 * normalZ * normalX;
       const ry = 2 * normalZ * normalY;
       const rz = -1 + 2 * normalZ * normalZ;
-      const { u, v } = directionToEquirectUV(rx, ry, rz, invTwoPi, invPi);
+      const aligned = alignReflectionToPanoramaFront(rx, ry, rz);
+      const { u, v } = directionToEquirectUV(
+        aligned.x,
+        aligned.y,
+        aligned.z,
+        invTwoPi,
+        invPi
+      );
       const [r, g, b] = sampleBilinear(u, v);
       output[oi] = r;
       output[oi + 1] = g;

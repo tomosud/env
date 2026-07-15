@@ -82,6 +82,7 @@ export type SceneSnapshot = {
   cameras: SceneCamera[];
   activeCameraId: string;
   iblRotation: number;
+  matcapMirrorX: boolean;
 };
 
 export type ProjectSettingsSnapshot = SceneSnapshot & {
@@ -366,7 +367,8 @@ export function createSceneSnapshot(
   lights: SceneLight[],
   cameras: SceneCamera[],
   activeCameraId: string,
-  iblRotation: number
+  iblRotation: number,
+  matcapMirrorX = false
 ): SceneSnapshot {
   const normalizedLights = normalizeLights(lights);
   const normalizedCameras = normalizeCameras(cameras);
@@ -382,6 +384,7 @@ export function createSceneSnapshot(
     cameras: structuredClone(normalizedCameras),
     activeCameraId: selectedCameraId,
     iblRotation: asFiniteNumber(iblRotation, 0),
+    matcapMirrorX: asBoolean(matcapMirrorX, false),
   };
 }
 
@@ -393,13 +396,15 @@ export function parseSceneSnapshot(input: unknown): SceneSnapshot | null {
   const lights = normalizeLights(input.lights, true);
   const cameras = normalizeCameras(input.cameras);
   const iblRotation = asFiniteNumber(input.iblRotation, 0);
+  const matcapMirrorX = asBoolean(input.matcapMirrorX, false);
 
   if (input.version === 2) {
     return createSceneSnapshot(
       lights,
       cameras,
       asString(input.activeCameraId, cameras[0].id),
-      iblRotation
+      iblRotation,
+      matcapMirrorX
     );
   }
 
@@ -408,7 +413,8 @@ export function parseSceneSnapshot(input: unknown): SceneSnapshot | null {
       lights,
       cameras,
       normalizeLegacyActiveCameraId(input, cameras),
-      iblRotation
+      iblRotation,
+      matcapMirrorX
     );
   }
 

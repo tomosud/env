@@ -22,6 +22,7 @@ Thanks to the [pmndrs/env](https://github.com/pmndrs/env) maintainers and contri
 - `IBL Yaw` rotation for the environment (included in undo/redo history)
 - Right-side **IBL MATCAP** panel:
   - Live hemisphere preview (auto-updates while editing)
+  - Optional left/right mirroring, saved with the scene JSON
   - Save as `PNG`, `HDR`, or `OpenEXR (.exr)`
   - Resolution selector (`1k`, `2k`, `4k`) for exports
 

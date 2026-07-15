@@ -8,6 +8,7 @@ import {
   envMapTextureAtom,
   imageBasenameAtom,
   iblRotationAtom,
+  matcapMirrorXAtom,
   projectDirectoryHandleAtom,
   sceneHistoryAtom,
   sceneRendererAtom,
@@ -36,7 +37,8 @@ function drawHemisphereFromEquirect(
   pixels: Uint8Array,
   sourceWidth: number,
   sourceHeight: number,
-  canvas: HTMLCanvasElement
+  canvas: HTMLCanvasElement,
+  mirrorX: boolean
 ) {
   const context = canvas.getContext("2d");
   if (!context) {
@@ -46,7 +48,8 @@ function drawHemisphereFromEquirect(
     pixels,
     sourceWidth,
     sourceHeight,
-    PREVIEW_SIZE
+    PREVIEW_SIZE,
+    mirrorX
   );
   context.putImageData(new ImageData(target, PREVIEW_SIZE, PREVIEW_SIZE), 0, 0);
 }
@@ -74,6 +77,7 @@ export function IBLMatcapPanel() {
   const projectDirectoryHandle = useAtomValue(projectDirectoryHandleAtom);
   const historyIndex = useAtomValue(sceneHistoryAtom).index;
   const [iblRotation, setIblRotation] = useAtom(iblRotationAtom);
+  const [matcapMirrorX, setMatcapMirrorX] = useAtom(matcapMirrorXAtom);
   const [resolution, setResolution] = useState<ExportResolution>("2k");
   const [isSavingPNG, setIsSavingPNG] = useState(false);
   const [isSavingHDR, setIsSavingHDR] = useState(false);
@@ -105,14 +109,15 @@ export function IBLMatcapPanel() {
         pixels,
         DEFAULT_EQUIRECT_WIDTH,
         DEFAULT_EQUIRECT_HEIGHT,
-        previewCanvasRef.current
+        previewCanvasRef.current,
+        matcapMirrorX
       );
       return true;
     } catch (error) {
       console.error(error);
       return false;
     }
-  }, [texture, renderer]);
+  }, [texture, renderer, matcapMirrorX]);
 
   useEffect(() => {
     let rafId: number | null = null;
@@ -156,7 +161,8 @@ export function IBLMatcapPanel() {
         equirect,
         sampleWidth,
         sampleHeight,
-        outputSize
+        outputSize,
+        matcapMirrorX
       );
       const canvas = document.createElement("canvas");
       canvas.width = outputSize;
@@ -224,7 +230,8 @@ export function IBLMatcapPanel() {
         equirectFloat,
         sampleWidth,
         sampleHeight,
-        outputSize
+        outputSize,
+        matcapMirrorX
       );
       const saveResult = await saveOutputFiles({
         projectDirectoryHandle,
@@ -282,7 +289,8 @@ export function IBLMatcapPanel() {
         equirectFloat,
         sampleWidth,
         sampleHeight,
-        outputSize
+        outputSize,
+        matcapMirrorX
       );
       const saveResult = await saveOutputFiles({
         projectDirectoryHandle,
@@ -321,81 +329,102 @@ export function IBLMatcapPanel() {
   }
 
   return (
-    <div className="w-[250px] rounded-md bg-black/30 ring-1 ring-white/15 p-2 space-y-2">
-      <div className="flex items-center justify-between">
+    <div className="w-full rounded-md bg-black/30 ring-1 ring-white/15 p-2">
+      <div className="flex items-center justify-between mb-2">
         <h3 className="text-[10px] tracking-widest uppercase text-white/80">
           IBL Matcap
         </h3>
         <span className="text-[10px] text-white/50">{rotationDeg} deg</span>
       </div>
 
-      <div className="w-full aspect-square rounded bg-black/60 overflow-hidden ring-1 ring-white/10">
-        <canvas
-          ref={previewCanvasRef}
-          width={PREVIEW_SIZE}
-          height={PREVIEW_SIZE}
-          className="w-full h-full block"
-        />
+      <div className="flex flex-wrap items-stretch gap-3">
+        <div className="flex-1 basis-[190px] min-w-[160px] max-w-[256px] aspect-square rounded bg-black/60 overflow-hidden ring-1 ring-white/10">
+          <canvas
+            ref={previewCanvasRef}
+            width={PREVIEW_SIZE}
+            height={PREVIEW_SIZE}
+            className="w-full h-full block"
+          />
+        </div>
+
+        <div className="flex-1 basis-[180px] min-w-[160px] flex flex-col justify-between gap-3">
+          <div>
+            <label className="block text-[10px] tracking-wider uppercase text-white/60 mb-1">
+              IBL Yaw
+            </label>
+            <input
+              className="w-full h-1.5 accent-blue-500"
+              type="range"
+              min={-180}
+              max={180}
+              step={1}
+              value={rotationDeg}
+              onChange={(event) =>
+                setIblRotation(
+                  THREE.MathUtils.degToRad(Number(event.target.value))
+                )
+              }
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] tracking-wider uppercase text-white/60 mb-1">
+              Export resolution
+            </label>
+            <select
+              className="w-full h-7 rounded-md bg-neutral-900 ring-1 ring-white/20 px-2 text-[10px] uppercase tracking-wide"
+              value={resolution}
+              onChange={(event) =>
+                setResolution(event.target.value as ExportResolution)
+              }
+              disabled={isSavingHDR}
+            >
+              <option value="1k">1k</option>
+              <option value="2k">2k</option>
+              <option value="4k">4k</option>
+            </select>
+          </div>
+
+          <label className="flex items-center gap-2 text-[10px] tracking-wider uppercase text-white/70 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={matcapMirrorX}
+              onChange={(event) => setMatcapMirrorX(event.target.checked)}
+              className="h-3.5 w-3.5 accent-blue-500"
+            />
+            Mirror left / right
+          </label>
+
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              className="flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleSavePNG}
+              disabled={!canSavePNG}
+            >
+              <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
+              PNG
+            </button>
+
+            <button
+              className="flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleSaveHDR}
+              disabled={!canSaveHDR}
+            >
+              <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
+              HDR
+            </button>
+
+            <button
+              className="flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleSaveEXR}
+              disabled={!canSaveEXR}
+            >
+              <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
+              EXR
+            </button>
+          </div>
+        </div>
       </div>
-
-      <div>
-        <label className="block text-[10px] tracking-wider uppercase text-white/60 mb-1">
-          IBL Yaw
-        </label>
-        <input
-          className="w-full h-1.5 accent-blue-500"
-          type="range"
-          min={-180}
-          max={180}
-          step={1}
-          value={rotationDeg}
-          onChange={(event) =>
-            setIblRotation(THREE.MathUtils.degToRad(Number(event.target.value)))
-          }
-        />
-      </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        <button
-          className="flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={handleSavePNG}
-          disabled={!canSavePNG}
-        >
-          <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
-          PNG
-        </button>
-
-        <button
-          className="flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={handleSaveHDR}
-          disabled={!canSaveHDR}
-        >
-          <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
-          HDR
-        </button>
-
-        <button
-          className="flex items-center justify-center text-[11px] px-2 py-1.5 tracking-wide uppercase font-semibold bg-white/10 hover:bg-white/20 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={handleSaveEXR}
-          disabled={!canSaveEXR}
-        >
-          <ArrowDownTrayIcon className="w-3.5 h-3.5 mr-1.5" />
-          EXR
-        </button>
-      </div>
-
-      <select
-        className="w-full h-7 rounded-md bg-neutral-900 ring-1 ring-white/20 px-2 text-[10px] uppercase tracking-wide"
-        value={resolution}
-        onChange={(event) =>
-          setResolution(event.target.value as ExportResolution)
-        }
-        disabled={isSavingHDR}
-      >
-        <option value="1k">HDR 1k</option>
-        <option value="2k">HDR 2k</option>
-        <option value="4k">HDR 4k</option>
-      </select>
     </div>
   );
 }
