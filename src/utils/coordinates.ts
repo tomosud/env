@@ -2,6 +2,7 @@ import * as THREE from "three";
 
 export const ENV_SPHERE_RADIUS = 3;
 export const ENV_CAPTURE_RESOLUTION = 1024;
+export const ENV_PREVIEW_CAPTURE_RESOLUTION = 512;
 export const ENV_CAPTURE_NEAR = 0.01;
 export const ENV_CAPTURE_FAR = 100;
 

@@ -2,6 +2,7 @@ import { Canvas } from "@react-three/fiber";
 import { EnvMapPlane } from "./EnvMapPlane";
 import { useSetAtom } from "jotai";
 import { deselectLightsAtom } from "../../store";
+import { InvalidateOnEnvironmentChange } from "../Env/InvalidateOnEnvironmentChange";
 
 export function HDRIPreview() {
   const deselectLights = useSetAtom(deselectLightsAtom);
@@ -15,10 +16,12 @@ export function HDRIPreview() {
       }}
     >
       <Canvas
-        dpr={[1, 2]}
-        gl={{ antialias: true, alpha: true }}
+        dpr={1}
+        frameloop="demand"
+        gl={{ antialias: false, alpha: true }}
         onPointerMissed={() => deselectLights()}
       >
+        <InvalidateOnEnvironmentChange />
         <EnvMapPlane />
       </Canvas>
     </div>

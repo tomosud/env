@@ -142,7 +142,7 @@ export function ProceduralScrimLightMaterial({
       light.lightPosition.y
     );
     ref.current.uniforms.uLightDistance.value = light.lightDistance;
-  });
+  }, -2);
 
   return (
     <proceduralScrimLightShaderMaterial

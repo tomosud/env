@@ -6,6 +6,7 @@ import { CubeMaterial } from "./CubeMaterial";
 import { useEffect, useRef } from "react";
 import { useSetAtom } from "jotai";
 import { envMapTextureAtom, sceneRendererAtom } from "../../store";
+import { OnDemandCubemapCapture } from "../Env/OnDemandCubemapCapture";
 import {
   ENV_CAPTURE_FAR,
   ENV_CAPTURE_NEAR,
@@ -46,6 +47,11 @@ function getEventOffsets(event: Event) {
 
 export function EnvMapPlane() {
   const ref = useRef<THREE.Mesh>(null!);
+  const cubeCaptureRef = useRef<{
+    scene: THREE.Scene;
+    fbo: THREE.WebGLCubeRenderTarget;
+    camera: THREE.CubeCamera;
+  }>(null!);
   const lastTextureRef = useRef<THREE.CubeTexture | null>(null);
   const viewport = useThree((state) => state.viewport);
   const renderer = useThree((state) => state.gl);
@@ -119,14 +125,16 @@ export function EnvMapPlane() {
         <planeGeometry />
         <CubeMaterial>
           <RenderCubeTexture
+            ref={cubeCaptureRef}
             attach="map"
             compute={compute}
-            frames={Infinity}
+            frames={0}
             resolution={ENV_CAPTURE_RESOLUTION}
             near={ENV_CAPTURE_NEAR}
             far={ENV_CAPTURE_FAR}
           >
             <Env enableEvents />
+            <OnDemandCubemapCapture cameraRef={cubeCaptureRef} />
           </RenderCubeTexture>
         </CubeMaterial>
       </mesh>

@@ -105,7 +105,7 @@ export function ProceduralRectLightMaterial({
     ref.current.uniforms.uBlur.value = light.blur;
     ref.current.uniforms.uEnergyScale.value = energyScale;
     ref.current.uniforms.uPad.value = pad;
-  });
+  }, -2);
 
   return (
     <proceduralRectLightShaderMaterial

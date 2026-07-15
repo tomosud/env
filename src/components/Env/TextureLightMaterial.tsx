@@ -6,11 +6,11 @@ import {
   useFrame,
   useLoader,
 } from "@react-three/fiber";
-import { PrimitiveAtom, useAtomValue } from "jotai";
-import { useRef, useState } from "react";
+import { PrimitiveAtom, useAtomValue, useSetAtom } from "jotai";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { EXRLoader } from "three-stdlib";
-import { TextureLight } from "../../store";
+import { notifyEnvironmentAssetLoadedAtom, TextureLight } from "../../store";
 
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -71,14 +71,21 @@ export function TextureLightMaterial({
   const light = useAtomValue(lightAtom);
   const ref = useRef<ThreeElements["textureLightShaderMaterial"]>(null!);
   const texture = useLoader(EXRLoader, light.map);
+  const notifyEnvironmentAssetLoaded = useSetAtom(
+    notifyEnvironmentAssetLoadedAtom
+  );
 
   const [color] = useState(() => new THREE.Color(0xffffff));
+
+  useEffect(() => {
+    notifyEnvironmentAssetLoaded();
+  }, [texture, notifyEnvironmentAssetLoaded]);
 
   useFrame(() => {
     ref.current.uniforms.uOpacity.value = light.opacity;
     ref.current.uniforms.uIntensity.value = light.intensity;
     ref.current.uniforms.uColor.value = color.set(light.color);
-  });
+  }, -2);
 
   return (
     <textureLightShaderMaterial

@@ -234,6 +234,7 @@ const camerasDataStateAtom = atom<SceneCamera[]>(
 const selectedCameraIdStateAtom = atom<string>(defaultSceneSnapshot.activeCameraId);
 const iblRotationStateAtom = atom<number>(0);
 const matcapMirrorXStateAtom = atom(false);
+const environmentAssetRevisionStateAtom = atom(0);
 const isApplyingSceneSnapshotAtom = atom(false);
 const sceneDirtyAtom = atom(false);
 
@@ -291,6 +292,23 @@ export const currentSceneSnapshotAtom = atom((get) =>
     get(matcapMirrorXStateAtom)
   )
 );
+
+// Rendering the environment only depends on authored lights, solo state, and
+// IBL rotation. Selection, cameras, and matcap display options must not wake
+// both WebGL canvases or recapture their cubemaps.
+export const environmentRenderStateAtom = atom((get) => ({
+  lights: get(lightsDataStateAtom),
+  soloLightId: get(soloLightIdStateAtom),
+  iblRotation: get(iblRotationStateAtom),
+  assetRevision: get(environmentAssetRevisionStateAtom),
+}));
+
+export const notifyEnvironmentAssetLoadedAtom = atom(null, (get, set) => {
+  set(
+    environmentAssetRevisionStateAtom,
+    get(environmentAssetRevisionStateAtom) + 1
+  );
+});
 
 const pushSceneHistoryAtom = atom(null, (get, set, snapshot?: SceneSnapshot) => {
   if (get(isApplyingSceneSnapshotAtom)) {

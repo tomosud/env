@@ -75,7 +75,7 @@ export function SkyGradientLightMaterial({
     ref.current.uniforms.uIntensity.value = light.intensity;
     ref.current.uniforms.uColor.value = color.set(light.color);
     ref.current.uniforms.uColor2.value = color2.set(light.color2);
-  });
+  }, -2);
 
   return (
     <skyGradientLightShaderMaterial

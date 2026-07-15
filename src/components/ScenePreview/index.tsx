@@ -13,10 +13,12 @@ import {
 import {
   ENV_CAPTURE_FAR,
   ENV_CAPTURE_NEAR,
-  ENV_CAPTURE_RESOLUTION,
+  ENV_PREVIEW_CAPTURE_RESOLUTION,
   sphericalToLatLon,
 } from "../../utils/coordinates";
 import { Env } from "../Env";
+import { InvalidateOnEnvironmentChange } from "../Env/InvalidateOnEnvironmentChange";
+import { OnDemandCubemapCapture } from "../Env/OnDemandCubemapCapture";
 import { Model } from "../Model";
 import { Cameras } from "./Cameras";
 import { Controls } from "./Controls";
@@ -87,6 +89,7 @@ export function ScenePreview() {
     <Canvas
       shadows
       dpr={[1, 2]}
+      frameloop="demand"
       gl={{
         preserveDrawingBuffer: true, // for screenshot
         logarithmicDepthBuffer: true,
@@ -106,6 +109,7 @@ export function ScenePreview() {
           });
         }}
       >
+        <InvalidateOnEnvironmentChange />
         <Cameras />
         <Lights ambientLightIntensity={0.2} />
 
@@ -121,13 +125,14 @@ export function ScenePreview() {
 
         <Suspense fallback={null}>
           <Environment
-            resolution={ENV_CAPTURE_RESOLUTION}
+            resolution={ENV_PREVIEW_CAPTURE_RESOLUTION}
             far={ENV_CAPTURE_FAR}
             near={ENV_CAPTURE_NEAR}
-            frames={Infinity}
+            frames={0}
             background
           >
             <Env />
+            <OnDemandCubemapCapture />
           </Environment>
         </Suspense>
 

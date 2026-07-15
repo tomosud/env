@@ -201,7 +201,7 @@ export function LightRenderer({
     meshRef.current.lookAt(light.target.x, light.target.y, light.target.z);
     meshRef.current.rotateZ(light.rotation);
     meshRef.current.updateMatrix();
-  });
+  }, -2);
 
   if (light.type === "sky_gradient") {
     return (

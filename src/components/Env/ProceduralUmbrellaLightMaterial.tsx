@@ -89,7 +89,7 @@ export function ProceduralUmbrellaLightMaterial({
     ref.current.uniforms.uIntensity.value = light.intensity;
     ref.current.uniforms.uColor.value = color.set(light.color);
     ref.current.uniforms.uLightSides.value = light.lightSides;
-  });
+  }, -2);
 
   return (
     <proceduralUmbrellaLightShaderMaterial
